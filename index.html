@@ -181,6 +181,12 @@
 
   <!-- HOME -->
   <div class="view active" id="view-home">
+    <div id="storageBanner" style="display:none;background:#B3402A;color:#fff;border-radius:14px;
+      padding:12px 14px;font-size:13px;line-height:1.5;font-weight:600;margin-bottom:14px;">
+      ⚠️ Storage is blocked on this device — workouts will NOT survive closing the app.
+      Turn off Settings → Safari → “Block All Cookies”, and always open from your
+      home-screen icon. Use “Export backup” below to save your data in the meantime.
+    </div>
     <h2>Start a workout</h2>
     <div id="dayList"></div>
 
@@ -190,12 +196,21 @@
     <h2>Program</h2>
     <div class="btnrow">
       <button class="btn" id="importBtn">Import program PDF</button>
-      <button class="btn ghost" id="resetBtn">Reset to default</button>
+      <button class="btn ghost" id="resetBtn">Load sample program</button>
     </div>
     <p class="settings-note">Import reads any workout-log PDF in the standard format
       (label · exercise · target · load · rest · time columns) and replaces the program.
       Your logged sessions are kept.</p>
+
+    <h2>Backup</h2>
+    <div class="btnrow">
+      <button class="btn" id="backupBtn">Export backup</button>
+      <button class="btn ghost" id="restoreBtn">Restore backup</button>
+    </div>
+    <p class="settings-note">Backup saves your program and full workout history as a file
+      you can keep in iCloud/Files. Restore loads it back — on this phone or any other.</p>
     <input type="file" id="pdfFile" accept="application/pdf" style="display:none">
+    <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
   </div>
 
   <!-- LOG -->
@@ -339,9 +354,20 @@ function setAccent(day){
 }
 
 /* ============ init ============ */
+async function checkPersistence(){
+  try{ if(window.storage) return true; }catch(e){}
+  try{
+    localStorage.setItem("__persist_test","1");
+    const ok = localStorage.getItem("__persist_test")==="1";
+    localStorage.removeItem("__persist_test");
+    if(ok && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+    return ok;
+  }catch(e){ return false; }
+}
 (async function init(){
-  program = (await store.get("program")) || DEFAULT_PROGRAM;
+  program = await store.get("program");   // starts empty until imported or sample loaded
   sessions = (await store.get("sessions")) || [];
+  if(!(await checkPersistence())) $("#storageBanner").style.display = "block";
   renderHome();
 })();
 
@@ -349,8 +375,13 @@ function setAccent(day){
 function renderHome(){
   showView("home");
   $("#title").textContent = "Workout Log";
-  $("#subtitle").textContent = program.days.length + "-day program";
+  $("#subtitle").textContent = program ? program.days.length + "-day program" : "no program loaded";
   const dl = $("#dayList");
+  if(!program || !program.days.length){
+    dl.innerHTML = `<div class="empty">No program loaded yet.<br><br>
+      Import a workout-log PDF below, load the sample program,
+      or restore a backup to get started.</div>`;
+  } else {
   dl.innerHTML = program.days.map((d,i)=>`
     <div class="daycard" data-day="${d.id}" style="--dc:${d.accent};--dcl:${d.light}">
       <div><div class="dc-name">${esc(d.name)}</div>
@@ -358,12 +389,13 @@ function renderHome(){
       <div class="dc-time">${esc(d.total||"")}</div>
     </div>`).join("");
   dl.querySelectorAll(".daycard").forEach(c=>c.onclick=()=>openDay(c.dataset.day));
+  }
 
   const rl = $("#recentList");
   if(!sessions.length){ rl.innerHTML = `<div class="empty">No sessions yet. Pick a day above — your first log starts the streak.</div>`; }
   else{
     rl.innerHTML = sessions.slice().sort((a,b)=>b.savedAt-a.savedAt).slice(0,12).map(s=>{
-      const d = program.days.find(x=>x.id===s.dayId);
+      const d = program ? program.days.find(x=>x.id===s.dayId) : null;
       const done = Object.values(s.sets||{}).flat().filter(x=>x&&x.done).length;
       return `<div class="sess" data-id="${s.id}" style="--dc:${d?d.accent:"#999"}">
         <div class="dot"></div>
@@ -385,6 +417,7 @@ async function openDay(dayId){
 }
 function openSession(id){
   const s = sessions.find(x=>x.id===id); if(!s) return;
+  if(!program || !program.days.length){ toast("Load a program first to view sessions"); return; }
   curDay = program.days.find(d=>d.id===s.dayId) || program.days[0];
   editingId = id;
   cur = JSON.parse(JSON.stringify(s));
@@ -586,7 +619,40 @@ $("#importBtn").onclick = ()=> $("#pdfFile").click();
 $("#resetBtn").onclick = async ()=>{
   program = JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
   await store.set("program", program);
-  toast("Program reset to default"); renderHome();
+  toast("Sample program loaded"); renderHome();
+};
+
+/* ---- backup / restore ---- */
+$("#backupBtn").onclick = ()=>{
+  const data = { app:"workout-logger", version:1, exportedAt:new Date().toISOString(),
+                 program, sessions };
+  const blob = new Blob([JSON.stringify(data,null,1)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "workout-backup-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  toast("Backup exported — save it to Files/iCloud");
+};
+$("#restoreBtn").onclick = ()=> $("#jsonFile").click();
+$("#jsonFile").onchange = async e=>{
+  const file = e.target.files[0]; e.target.value = "";
+  if(!file) return;
+  try{
+    const data = JSON.parse(await file.text());
+    if(data.app!=="workout-logger" || !("sessions" in data)) throw new Error("bad file");
+    const incoming = Array.isArray(data.sessions) ? data.sessions : [];
+    // merge sessions: keep everything, prefer incoming on id clashes
+    const byId = {};
+    sessions.forEach(s=>byId[s.id]=s);
+    incoming.forEach(s=>byId[s.id]=s);
+    sessions = Object.values(byId).sort((a,b)=>a.savedAt-b.savedAt);
+    if(data.program) program = data.program;
+    await store.set("sessions", sessions);
+    if(program) await store.set("program", program);
+    toast(`Restored ${incoming.length} sessions`+(data.program?" + program":""));
+    renderHome();
+  }catch(err){ toast("That doesn't look like a workout backup file"); }
 };
 $("#pdfFile").onchange = async e=>{
   const file = e.target.files[0]; e.target.value = "";
