@@ -497,9 +497,12 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.2";
+const APP_VERSION = "1.1.3";
 const CHANGELOG = [
-  { ver:"1.1.2", date:"Jul 21, 2026", time:"12:10 AM", tag:"current", notes:[
+  { ver:"1.1.3", date:"Jul 21, 2026", time:"9:41 AM", tag:"current", notes:[
+    "Fixed a bug where changing your phone's light/dark mode would kick you back to the home screen from other pages.",
+    "The beta notes dropdown now says “Hide 1.1.0 beta notes” once it's open." ]},
+  { ver:"1.1.2", date:"Jul 21, 2026", time:"12:10 AM", notes:[
     "Added dark mode — choose Light, Dark, or Match device in Settings under Appearance.",
     "Fixed the changelog so it opens scrolled to the top instead of partway down." ]},
   { ver:"1.1.1", date:"Jul 20, 2026", time:"11:54 PM", notes:[
@@ -514,7 +517,8 @@ const CHANGELOG = [
     "Settings page — barbell weight (default 45 lb) and interval lead-in countdown (default 5 sec).",
     "Program & Data page — program import and backup/restore, moved off the home screen.",
     "Smarter rest timer — survives leaving the app and shows the correct time (or GO!) on return, with sound + vibration when it ends.",
-    "Cleaned up the workout screen (smaller date field, removed the Energy field)." ]},
+    "Cleaned up the workout screen (smaller date field, removed the Energy field).",
+    "Added a version history / changelog page." ]},
   { ver:"1.0.2", date:"Jul 19, 2026", time:"6:08 PM", notes:[
     "Removed the baked-in default workout — the app now starts empty until you import a program.",
     "Added backup export & restore, and PDF program import.",
@@ -553,7 +557,7 @@ const BETA_HISTORY = [
   { ver:"1.1.0 beta 1", date:"Jul 20, 2026", time:"10:21 PM", notes:[
     "Added “last time” ghost data.",
     "Added progress charts.",
-    "Removed weight (load) tracking temporarily." ]}
+    "Removed weight (load) tracking." ]}
 ];
 
 /* ============ storage adapter: window.storage -> localStorage -> memory ============ */
@@ -678,7 +682,11 @@ function applyTheme(){
 }
 if(window.matchMedia){
   try{ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
-    if((settings.theme||"device")==="device"){ applyTheme(); if(typeof renderHome==="function") renderHome(); }
+    if((settings.theme||"device")==="device"){
+      applyTheme();
+      const active = document.querySelector(".view.active");
+      if(active && active.id==="view-home" && typeof renderHome==="function") renderHome();
+    }
   }); }catch(e){}
 }
 
@@ -903,8 +911,8 @@ function openChangelog(){
     </div>`;
   };
   const betaDetails = `
-    <details class="beta-notes">
-      <summary>View 1.1.0 beta notes</summary>
+    <details class="beta-notes" id="betaDetails">
+      <summary id="betaSummary">View 1.1.0 beta notes</summary>
       <div class="beta-inner">${BETA_HISTORY.map(entry).join("")}</div>
     </details>`;
   // insert the beta dropdown right after the 1.1.0 entry
@@ -914,6 +922,10 @@ function openChangelog(){
     return block;
   }).join("");
   $("#changelogWrap").innerHTML = `<div class="clog">${html}</div>`;
+  const det = $("#betaDetails");
+  if(det) det.addEventListener("toggle", ()=>{
+    $("#betaSummary").textContent = (det.open ? "Hide" : "View") + " 1.1.0 beta notes";
+  });
 }
 
 /* ============ PROGRESS CHARTS ============ */
