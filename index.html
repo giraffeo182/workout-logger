@@ -69,14 +69,13 @@
     border-radius:14px;padding:16px;text-align:center;}
 
   /* log view */
-  .meta{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-bottom:6px;align-items:end;}
+  .meta{margin-bottom:6px;}
   .field label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;
     letter-spacing:.08em;color:var(--muted);margin-bottom:4px;}
-  .field input,.field textarea{width:100%;font-size:16px;padding:12px;border-radius:12px;
+  .field input,.field textarea{width:100%;font-size:16px;padding:10px;border-radius:12px;
     border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;
-    box-sizing:border-box;height:48px;line-height:1.2;}
-  .meta .field input{text-align:center;}
-  .field textarea{min-height:64px;height:auto;resize:vertical;text-align:left;}
+    box-sizing:border-box;}
+  .field textarea{min-height:64px;resize:vertical;}
   input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent;}
 
   .warm{background:var(--accent-l);border-radius:14px;padding:12px 14px;font-size:13px;
@@ -256,7 +255,6 @@
   <div class="view" id="view-log">
     <div class="meta">
       <div class="field"><label>Date</label><input type="date" id="f-date"></div>
-      <div class="field"><label>Energy 1–10</label><input inputmode="numeric" id="f-energy" placeholder="7"></div>
     </div>
     <div class="warm" id="warmBox"></div>
     <div id="exList"></div>
@@ -320,7 +318,7 @@ const CHANGELOG = [
     "Added “last time” ghost data — each exercise shows your previous session's weights and reps as hints.",
     "Added progress charts: top-set weight over time, per exercise.",
     "Removed weight (load) tracking for now — coming back in a later 1.1.0 build.",
-    "Fixed the Date / Energy field alignment at the top of a workout." ]},
+    "Removed the Energy field and cleaned up the top of a workout." ]},
   { ver:"1.0.2", date:"Jul 19, 2026", notes:[
     "Removed the baked-in default workout — the app now starts empty until you import a program.",
     "Added backup export & restore, and PDF program import.",
@@ -468,7 +466,7 @@ function renderHome(){
       return `<div class="sess" data-id="${s.id}" style="--dc:${d?d.accent:"#999"}">
         <div class="dot"></div>
         <div class="s-main"><div class="s-day">${esc(s.dayName||d?.name||"Workout")}</div>
-        <div class="s-meta">${esc(s.date)}${s.energy?" · energy "+esc(s.energy):""}${sessionVolume(s)?" · "+sessionVolume(s)+" sets logged":""}</div></div>
+        <div class="s-meta">${esc(s.date)}${sessionVolume(s)?" · "+sessionVolume(s)+" sets logged":""}</div></div>
         <div class="s-count">${done} sets</div></div>`;
     }).join("");
     rl.querySelectorAll(".sess").forEach(el=>el.onclick=()=>openSession(el.dataset.id));
@@ -608,7 +606,7 @@ function newSession(day){
   const sets = {};
   day.exercises.forEach((ex,i)=>{ sets[i] = Array.from({length:ex.sets},()=>({w:"",r:"",done:false})); });
   return { id:"s_"+Date.now(), dayId:day.id, dayName:day.name,
-    date:new Date().toISOString().slice(0,10), energy:"",
+    date:new Date().toISOString().slice(0,10),
     sets, cardioDone:false, notes:"", savedAt:Date.now() };
 }
 
@@ -623,7 +621,7 @@ function renderLog(){
   $("#finishBtn").textContent = editingId ? "Save changes" : "Finish workout";
 
   $("#f-date").value = cur.date;
-  $("#f-energy").value = cur.energy; $("#f-notes").value = cur.notes;
+  $("#f-notes").value = cur.notes;
   $("#warmBox").innerHTML = `<b>Warm-up</b>${esc(curDay.warmup||"")}`;
   $("#minBox").innerHTML = `<b>Low-motivation day?</b> Minimum that still counts: ${esc(curDay.minimum||"first lift + one finisher")}. Never zero.`;
 
@@ -661,8 +659,8 @@ function renderLog(){
   });
   const ct = $("#cardioT");
   if(ct) ct.onclick = ()=>{ cur.cardioDone=!cur.cardioDone; ct.classList.toggle("on",cur.cardioDone); queueDraft(); };
-  ["f-date","f-energy","f-notes"].forEach(id=>{
-    $("#"+id).oninput = e=>{ const map={"f-date":"date","f-energy":"energy","f-notes":"notes"};
+  ["f-date","f-notes"].forEach(id=>{
+    $("#"+id).oninput = e=>{ const map={"f-date":"date","f-notes":"notes"};
       cur[map[id]] = e.target.value; queueDraft(); };
   });
   window.scrollTo(0,0);
@@ -798,7 +796,7 @@ $("#exportBtn").onclick = ()=>{
   doc.text(curDay.name.toUpperCase(), W/2, 52, {align:"center"});
   doc.setFontSize(10.5); doc.setTextColor(110);
   doc.setFont("helvetica","normal");
-  doc.text(`${curDay.focus}  •  ${cur.date}  •  Energy: ${cur.energy||"—"}/10`, W/2, 68, {align:"center"});
+  doc.text(`${curDay.focus}  •  ${cur.date}`, W/2, 68, {align:"center"});
 
   const maxSets = Math.max(...curDay.exercises.map(e=>e.sets));
   const head = [["","Exercise","Target","Load / RPE"].concat(
