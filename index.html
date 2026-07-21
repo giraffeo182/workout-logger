@@ -289,7 +289,16 @@
   .modal ul{font-size:13.5px;line-height:1.6;padding-left:18px;margin:0 0 14px;}
 
   .settings-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:6px;}
-  .view{display:none;} .view.active{display:block;}
+  .view{display:none;}
+  .view.active{display:block; animation:viewIn .22s ease both;}
+  .view.active.no-anim{animation:none;}
+  @keyframes viewIn{
+    from{opacity:0; transform:translateY(6px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .view.active{animation:none;}
+  }
   @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 </head>
@@ -549,9 +558,11 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.2.0 beta 2";
+const APP_VERSION = "1.2.0 beta 3";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 2", date:"Jul 21, 2026", time:"9:55 AM", tag:"current", notes:[
+  { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", tag:"current", notes:[
+    "Added a subtle fade-and-slide transition when moving between pages." ]},
+  { ver:"1.2.0 beta 2", date:"Jul 21, 2026", time:"9:55 AM", notes:[
     "Added a filter to the changelog to switch between all updates and major updates only.",
     "Fixed a flash of a leftover number when starting an interval timer." ]},
   { ver:"1.2.0 beta 1", date:"Jul 21, 2026", time:"9:51 AM", notes:[
@@ -1526,9 +1537,14 @@ document.addEventListener("visibilitychange", ()=>{
 });
 
 /* ============ navigation ============ */
+let lastView = null;
 function showView(v){
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
-  $("#view-"+v).classList.add("active");
+  const el = $("#view-"+v);
+  el.classList.add("active");
+  // only animate when moving to a different view (avoids jitter on same-view re-renders)
+  el.classList.toggle("no-anim", v===lastView);
+  lastView = v;
   $("#backBtn").style.display = v==="home" ? "none" : "block";
   if(v!=="log"){ $("#exportBtn").style.display="none"; $("#finishbar").style.display="none"; }
   if(v!=="log") setAccent(v==="chart"?{accent:"#2A4E8F",light:"#E4EAF6"}:null);
