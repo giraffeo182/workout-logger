@@ -121,6 +121,10 @@
     background:var(--card);color:var(--ink);font-family:inherit;font-weight:600;
     -webkit-appearance:none;appearance:none;}
   .setgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;}
+  .optrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px;}
+  .opt{font-size:15px;font-weight:700;padding:12px 16px;border-radius:12px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);cursor:pointer;flex:1 0 auto;min-width:72px;text-align:center;}
+  .opt.on{background:var(--accent);border-color:var(--accent);color:#fff;}
   .platebtn{grid-column:5 / 7;justify-self:start;font-size:11px;font-weight:700;color:var(--accent);
     background:var(--accent-l);border:none;border-radius:8px;padding:4px 8px;cursor:pointer;margin-top:-2px;}
   .platebox{grid-column:1 / 7;background:var(--accent-l);border-radius:10px;padding:8px 11px;
@@ -265,6 +269,54 @@
     <h2>Progress</h2>
     <div id="progressLink"></div>
 
+    <h2>More</h2>
+    <div class="progcard" id="openData">
+      <div><div class="pc-t">Program &amp; Data</div>
+      <div class="pc-s">Import program, backup &amp; restore</div></div>
+      <div class="chev">›</div></div>
+    <div class="progcard" id="openSettings" style="margin-top:10px">
+      <div><div class="pc-t">Settings</div>
+      <div class="pc-s">Barbell weight, interval lead-in</div></div>
+      <div class="chev">›</div></div>
+
+    <input type="file" id="pdfFile" accept="application/pdf" style="display:none">
+    <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
+
+    <div class="verfoot" id="verFoot"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="view" id="view-settings">
+    <h2>Barbell weight</h2>
+    <div class="optrow" id="barOpts">
+      <button class="opt" data-bar="45">45 lb</button>
+      <button class="opt" data-bar="35">35 lb</button>
+      <button class="opt" data-bar="25">25 lb</button>
+      <button class="opt" data-bar="custom">Custom</button>
+    </div>
+    <div class="field" id="barCustomWrap" style="display:none;margin-top:10px">
+      <label>Custom bar weight (lb)</label>
+      <input inputmode="decimal" id="setBarCustom" placeholder="e.g. 30">
+    </div>
+    <p class="settings-note">Used by the plate calculator on barbell lifts.</p>
+
+    <h2>Interval lead-in</h2>
+    <div class="optrow" id="leadOpts">
+      <button class="opt" data-lead="0">None</button>
+      <button class="opt" data-lead="3">3 sec</button>
+      <button class="opt" data-lead="5">5 sec</button>
+      <button class="opt" data-lead="10">10 sec</button>
+      <button class="opt" data-lead="custom">Custom</button>
+    </div>
+    <div class="field" id="leadCustomWrap" style="display:none;margin-top:10px">
+      <label>Custom lead-in (sec)</label>
+      <input inputmode="numeric" id="setLeadCustom" placeholder="e.g. 7">
+    </div>
+    <p class="settings-note">The countdown before an interval timer's first round.</p>
+  </div>
+
+  <!-- PROGRAM & DATA -->
+  <div class="view" id="view-data">
     <h2>Program</h2>
     <div class="btnrow">
       <button class="btn" id="importBtn">Import program PDF</button>
@@ -274,39 +326,6 @@
       (label · exercise · target · load · rest · time columns) and replaces the program.
       Your logged sessions are kept.</p>
 
-    <h2>Settings</h2>
-    <div class="setgrid">
-      <div class="field">
-        <label>Barbell weight</label>
-        <select id="setBar">
-          <option value="45">45 lb</option>
-          <option value="35">35 lb</option>
-          <option value="25">25 lb</option>
-          <option value="custom">Custom…</option>
-        </select>
-      </div>
-      <div class="field" id="barCustomWrap" style="display:none">
-        <label>Custom bar (lb)</label>
-        <input inputmode="decimal" id="setBarCustom" placeholder="e.g. 30">
-      </div>
-      <div class="field">
-        <label>Interval lead-in</label>
-        <select id="setLead">
-          <option value="0">None</option>
-          <option value="3">3 sec</option>
-          <option value="5">5 sec</option>
-          <option value="10">10 sec</option>
-          <option value="custom">Custom…</option>
-        </select>
-      </div>
-      <div class="field" id="leadCustomWrap" style="display:none">
-        <label>Custom lead-in (sec)</label>
-        <input inputmode="numeric" id="setLeadCustom" placeholder="e.g. 7">
-      </div>
-    </div>
-    <p class="settings-note">Barbell weight is used for the plate calculator on each weight entry.
-      Lead-in is the countdown before an interval timer's first round.</p>
-
     <h2>Backup</h2>
     <div class="btnrow">
       <button class="btn" id="backupBtn">Export backup</button>
@@ -314,10 +333,6 @@
     </div>
     <p class="settings-note">Backup saves your program and full workout history as a file
       you can keep in iCloud/Files. Restore loads it back — on this phone or any other.</p>
-    <input type="file" id="pdfFile" accept="application/pdf" style="display:none">
-    <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
-
-    <div class="verfoot" id="verFoot"></div>
   </div>
 
   <!-- LOG -->
@@ -392,24 +407,29 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.0 beta 5";
+const APP_VERSION = "1.1.0 beta 6";
 const CHANGELOG = [
-  { ver:"1.1.0 beta 5", date:"Jul 22, 2026", tag:"current", notes:[
-    "Added a plate calculator — barbell lifts now show the per-side plate breakdown under each set as you type the weight.",
+  { ver:"1.1.0 beta 6", date:"Jul 20, 2026", tag:"current", notes:[
+    "Moved Settings and Program & Data onto their own pages to declutter the home screen.",
+    "Settings options are now all visible as buttons; barbell weight now defaults to 45 lb.",
+    "Plate math is now tap-to-view — tap a weight box to show that set's plate breakdown, instead of showing all of them at once.",
+    "Corrected the 1.1.0 beta dates in this changelog." ]},
+  { ver:"1.1.0 beta 5", date:"Jul 20, 2026", notes:[
+    "Added a plate calculator — barbell lifts show the per-side plate breakdown for each set.",
     "Added a cardio interval timer with a full-screen WORK / REST display, round counter, and beep + vibration at every switch.",
-    "Added a Settings section: barbell weight (45 / 35 / 25 / custom) and interval lead-in countdown (default 5 sec)." ]},
-  { ver:"1.1.0 beta 4", date:"Jul 22, 2026", notes:[
+    "Added a Settings section: barbell weight and interval lead-in countdown (default 5 sec)." ]},
+  { ver:"1.1.0 beta 4", date:"Jul 20, 2026", notes:[
     "Rest timer now survives leaving the app — reopen it and it shows the correct time left (or GO!) instead of a frozen number.",
     "Added a sound + vibration when rest ends while the app is open.",
     "Changed the copy-set arrow to point down.",
     "Note: a true background alert while you're in another app (or on the Dynamic Island) isn't possible for a home-screen web app without a push server — this gets as close as the web allows." ]},
-  { ver:"1.1.0 beta 3", date:"Jul 22, 2026", notes:[
+  { ver:"1.1.0 beta 3", date:"Jul 20, 2026", notes:[
     "Added a “copy previous set” button — fill a set with the same weight and reps as the set above it in one tap.",
     "Made the Date field smaller so it no longer stretches across the whole screen." ]},
-  { ver:"1.1.0 beta 2", date:"Jul 21, 2026", notes:[
+  { ver:"1.1.0 beta 2", date:"Jul 20, 2026", notes:[
     "Added this version history / changelog page.",
     "Removed the Energy field and cleaned up the top of a workout." ]},
-  { ver:"1.1.0 beta 1", date:"Jul 21, 2026", notes:[
+  { ver:"1.1.0 beta 1", date:"Jul 20, 2026", notes:[
     "Added “last time” ghost data — each exercise shows your previous session's weights and reps as hints.",
     "Added progress charts: top-set weight over time, per exercise.",
     "Removed weight (load) tracking for now — coming back in a later 1.1.0 build." ]},
@@ -497,7 +517,7 @@ const DEFAULT_PROGRAM = { days: [
 /* ============ state ============ */
 let program = null;
 let sessions = [];
-let settings = { bar:25, lead:5 };
+let settings = { bar:45, lead:5 };
 let cur = null;          // current session being edited
 let curDay = null;       // day object
 let editingId = null;    // session id if editing a saved one
@@ -536,25 +556,43 @@ async function checkPersistence(){
 })();
 
 /* ============ SETTINGS ============ */
-function barWeight(){ return isFinite(settings.bar) ? settings.bar : 25; }
+function barWeight(){ return isFinite(settings.bar) ? settings.bar : 45; }
 function leadIn(){ return isFinite(settings.lead) ? settings.lead : 5; }
 async function saveSettings(){ await store.set("settings", settings); }
 function wireSettings(){
-  const barSel=$("#setBar"), barCustom=$("#setBarCustom"), barWrap=$("#barCustomWrap");
-  const leadSel=$("#setLead"), leadCustom=$("#setLeadCustom"), leadWrap=$("#leadCustomWrap");
-  // init bar
-  if([45,35,25].includes(settings.bar)){ barSel.value=String(settings.bar); barWrap.style.display="none"; }
-  else { barSel.value="custom"; barWrap.style.display=""; barCustom.value=settings.bar; }
-  // init lead
-  if([0,3,5,10].includes(settings.lead)){ leadSel.value=String(settings.lead); leadWrap.style.display="none"; }
-  else { leadSel.value="custom"; leadWrap.style.display=""; leadCustom.value=settings.lead; }
+  const barWrap=$("#barCustomWrap"), barCustom=$("#setBarCustom");
+  const leadWrap=$("#leadCustomWrap"), leadCustom=$("#setLeadCustom");
 
-  barSel.onchange=()=>{ if(barSel.value==="custom"){ barWrap.style.display=""; barCustom.focus(); }
-    else { barWrap.style.display="none"; settings.bar=+barSel.value; saveSettings(); } };
+  function paintBar(){
+    const preset=[45,35,25].includes(settings.bar);
+    $("#barOpts").querySelectorAll(".opt").forEach(b=>{
+      const v=b.dataset.bar;
+      b.classList.toggle("on", (v==="custom"&&!preset) || (+v===settings.bar));
+    });
+    barWrap.style.display = preset ? "none" : "";
+    if(!preset) barCustom.value = settings.bar;
+  }
+  function paintLead(){
+    const preset=[0,3,5,10].includes(settings.lead);
+    $("#leadOpts").querySelectorAll(".opt").forEach(b=>{
+      const v=b.dataset.lead;
+      b.classList.toggle("on", (v==="custom"&&!preset) || (+v===settings.lead));
+    });
+    leadWrap.style.display = preset ? "none" : "";
+    if(!preset) leadCustom.value = settings.lead;
+  }
+  $("#barOpts").querySelectorAll(".opt").forEach(b=>{
+    b.onclick=()=>{ if(b.dataset.bar==="custom"){ barWrap.style.display=""; barCustom.focus(); }
+      else { settings.bar=+b.dataset.bar; saveSettings(); } paintBar(); };
+  });
   barCustom.oninput=()=>{ const v=parseFloat(barCustom.value); if(isFinite(v)&&v>0){ settings.bar=v; saveSettings(); } };
-  leadSel.onchange=()=>{ if(leadSel.value==="custom"){ leadWrap.style.display=""; leadCustom.focus(); }
-    else { leadWrap.style.display="none"; settings.lead=+leadSel.value; saveSettings(); } };
+  $("#leadOpts").querySelectorAll(".opt").forEach(b=>{
+    b.onclick=()=>{ if(b.dataset.lead==="custom"){ leadWrap.style.display=""; leadCustom.focus(); }
+      else { settings.lead=+b.dataset.lead; saveSettings(); } paintLead(); };
+  });
   leadCustom.oninput=()=>{ const v=parseInt(leadCustom.value,10); if(isFinite(v)&&v>=0){ settings.lead=v; saveSettings(); } };
+
+  paintBar(); paintLead();
 }
 
 /* plate breakdown: returns array of per-side plates or null */
@@ -632,6 +670,10 @@ function renderHome(){
   const vf = $("#verFoot");
   vf.innerHTML = `<span>Version ${esc(APP_VERSION)} — what's new</span>`;
   vf.onclick = openChangelog;
+
+  // menu links
+  $("#openData").onclick = ()=>{ showView("data"); $("#title").textContent="Program & Data"; $("#subtitle").textContent="Import & backup"; };
+  $("#openSettings").onclick = ()=>{ showView("settings"); $("#title").textContent="Settings"; $("#subtitle").textContent="Preferences"; };
 }
 
 /* ============ CHANGELOG ============ */
@@ -755,6 +797,7 @@ function newSession(day){
 
 function renderLog(){
   showView("log");
+  plateOpen = {};
   setAccent(curDay);
   $("#title").textContent = curDay.name;
   $("#subtitle").textContent = curDay.focus + " · " + (curDay.total||"");
@@ -810,6 +853,14 @@ function renderLog(){
       if(f==="w") refreshPlate(ex, set);
       queueDraft(); };
   });
+  // tap a barbell weight box to toggle its plate breakdown
+  $("#exList").querySelectorAll('input[data-bb="1"]').forEach(inp=>{
+    inp.addEventListener("click", ()=>{
+      const {ex,set}=inp.dataset; const key=ex+":"+set;
+      plateOpen[key] = !plateOpen[key];
+      togglePlateLine(ex, set, plateOpen[key]);
+    });
+  });
   $("#exList").querySelectorAll(".setdone").forEach(btn=>{
     btn.onclick = ()=>{ const {ex,set}=btn.dataset; const s=cur.sets[ex][set];
       s.done=!s.done; btn.classList.toggle("on",s.done);
@@ -848,24 +899,27 @@ function renderLog(){
   window.scrollTo(0,0);
 }
 
-/* live-refresh a set's plate breakdown; create/remove the box as weight changes */
+/* refresh a set's plate line if it's currently open */
 function refreshPlate(ex, set){
-  if(!isBarbell(curDay.exercises[ex])) return;
-  const w = cur.sets[ex][set].w;
+  if(!plateOpen[ex+":"+set]) return;
+  const box = $(`#exList .platebox[data-plate-ex="${ex}"][data-plate-set="${set}"]`);
+  if(box) box.innerHTML = platesText(cur.sets[ex][set].w||"");
+}
+/* show or hide the plate line under a given set */
+function togglePlateLine(ex, set, show){
   const inp = $(`#exList input[data-ex="${ex}"][data-set="${set}"][data-f="w"]`);
   if(!inp) return;
   const row = inp.closest(".setrow");
-  let box = row.nextElementSibling;
-  const isBox = box && box.classList && box.classList.contains("platebox");
-  if(w){
-    if(isBox){ box.innerHTML = platesText(w); }
-    else {
-      const div = document.createElement("div");
-      div.className = "platebox";
-      div.innerHTML = platesText(w);
+  const next = row.nextElementSibling;
+  const isBox = next && next.classList && next.classList.contains("platebox");
+  if(show){
+    if(!isBox){
+      const div=document.createElement("div");
+      div.className="platebox"; div.dataset.plateEx=ex; div.dataset.plateSet=set;
+      div.innerHTML=platesText(cur.sets[ex][set].w||"");
       row.parentNode.insertBefore(div, row.nextSibling);
-    }
-  } else if(isBox){ box.remove(); }
+    } else { next.innerHTML=platesText(cur.sets[ex][set].w||""); }
+  } else if(isBox){ next.remove(); }
 }
 
 function sessionVolume(s){
@@ -896,6 +950,7 @@ function isBarbell(ex){
   return /barbell|bench press|back squat|\brdl\b|romanian|deadlift|\bogh? p\b|overhead press|\bbar\b/i.test(ex.name)
     && !/dumbbell|db |machine|cable/i.test(ex.name);
 }
+let plateOpen = {};  // "ex:set" -> true when that set's plate line is shown
 function exCard(ex, i){
   const sets = cur.sets[i] || [];
   const past = pastSetsFor(lastSessionFor(cur.dayId), ex);
@@ -904,12 +959,13 @@ function exCard(ex, i){
     const p = past && past.sets[j];
     const gw = p && p.w ? p.w : "wt";
     const gr = p && p.r ? p.r : "reps";
-    const plateLine = (bb && s.w) ?
-      `<div class="platebox" data-plate-ex="${i}" data-plate-set="${j}">${platesText(s.w)}</div>` : "";
+    const open = bb && plateOpen[i+":"+j];
+    const plateLine = open ?
+      `<div class="platebox" data-plate-ex="${i}" data-plate-set="${j}">${platesText(s.w||"")}</div>` : "";
     return `
     <div class="setrow">
       <div class="sn">${j+1}</div>
-      <input inputmode="decimal" placeholder="${esc(gw)}" value="${esc(s.w)}" data-ex="${i}" data-set="${j}" data-f="w">
+      <input inputmode="decimal" placeholder="${esc(gw)}" value="${esc(s.w)}" data-ex="${i}" data-set="${j}" data-f="w"${bb?' data-bb="1"':''}>
       <div class="x">×</div>
       <input inputmode="numeric" placeholder="${esc(gr)}" value="${esc(s.r)}" data-ex="${i}" data-set="${j}" data-f="r">
       <button class="setdone ${s.done?"on":""}" data-ex="${i}" data-set="${j}" aria-label="Set done">✓</button>
