@@ -499,9 +499,9 @@
 /* ============ version + changelog ============ */
 const APP_VERSION = "1.1.2";
 const CHANGELOG = [
-  { ver:"1.1.2", date:"Jul 21, 2026", time:"12:05 AM", tag:"current", notes:[
+  { ver:"1.1.2", date:"Jul 21, 2026", time:"12:10 AM", tag:"current", notes:[
     "Added dark mode — choose Light, Dark, or Match device in Settings under Appearance.",
-    "“Match device” follows your phone's system light/dark setting automatically and updates live." ]},
+    "Fixed the changelog so it opens scrolled to the top instead of partway down." ]},
   { ver:"1.1.1", date:"Jul 20, 2026", time:"11:54 PM", notes:[
     "Added release times to the changelog, with a toggle in Settings to show or hide them (off by default).",
     "Added the previously-missing beta 8 to the version history." ]},
@@ -1400,6 +1400,7 @@ function showView(v){
   $("#backBtn").style.display = v==="home" ? "none" : "block";
   if(v!=="log"){ $("#exportBtn").style.display="none"; $("#finishbar").style.display="none"; }
   if(v!=="log") setAccent(v==="chart"?{accent:"#2A4E8F",light:"#E4EAF6"}:null);
+  window.scrollTo(0,0);
 }
 function goHome(){ cur=null; curDay=null; editingId=null; stopTimer(); renderHome(); }
 $("#backBtn").onclick = goHome;
