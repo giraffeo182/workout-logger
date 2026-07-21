@@ -341,6 +341,12 @@
       <input inputmode="numeric" id="setLeadCustom" placeholder="e.g. 7">
     </div>
     <p class="settings-note">The countdown before an interval timer's first round.</p>
+
+    <h2>Changelog</h2>
+    <div class="togglewrap" style="padding:4px 2px">
+      <button class="toggle ${''}" id="setTimes" aria-label="Show release times"></button> Show release times
+    </div>
+    <p class="settings-note">Adds the time of day next to each version's date in the version history.</p>
   </div>
 
   <!-- PROGRAM & DATA -->
@@ -463,9 +469,12 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
 const CHANGELOG = [
-  { ver:"1.1.0", date:"Jul 20, 2026", tag:"current", notes:[
+  { ver:"1.1.1", date:"Jul 20, 2026", time:"11:54 PM", tag:"current", notes:[
+    "Added release times to the changelog, with a toggle in Settings to show or hide them (off by default).",
+    "Added the previously-missing beta 8 to the version history." ]},
+  { ver:"1.1.0", date:"Jul 20, 2026", time:"11:40 PM", notes:[
     "Plate calculator — barbell lifts have a plate icon that opens a two-way calculator: enter a weight to get the plates per side, or tap plates to get the total.",
     "Cardio interval timer — a full-screen WORK / REST display with round counter, adjustable work/rest/rounds, and beep + vibration at every switch.",
     "“Last time” ghost data — each exercise shows your previous session's weights and reps as hints in the input boxes.",
@@ -475,40 +484,42 @@ const CHANGELOG = [
     "Program & Data page — program import and backup/restore, moved off the home screen.",
     "Smarter rest timer — survives leaving the app and shows the correct time (or GO!) on return, with sound + vibration when it ends.",
     "Cleaned up the workout screen (smaller date field, removed the Energy field)." ]},
-  { ver:"1.0.2", date:"Jul 19, 2026", notes:[
+  { ver:"1.0.2", date:"Jul 19, 2026", time:"6:08 PM", notes:[
     "Removed the baked-in default workout — the app now starts empty until you import a program.",
     "Added backup export & restore, and PDF program import.",
     "Added a storage-blocked warning so data loss can't happen silently." ]},
-  { ver:"1.0.1", date:"Jul 19, 2026", notes:[
+  { ver:"1.0.1", date:"Jul 19, 2026", time:"4:42 PM", notes:[
     "Added the home-screen app icon." ]},
-  { ver:"1.0", date:"Jul 19, 2026", notes:[
+  { ver:"1.0", date:"Jul 19, 2026", time:"4:23 PM", notes:[
     "Initial launch — log sets, reps, and notes; rest timer; save sessions; export a filled PDF." ]}
 ];
 /* preserved beta history for 1.1.0, shown under a dropdown */
 const BETA_HISTORY = [
-  { ver:"1.1.0 beta 7", date:"Jul 20, 2026", notes:[
+  { ver:"1.1.0 beta 8", date:"Jul 20, 2026", time:"11:30 PM", notes:[
+    "Restored the 10-sec interval lead-in option, with Custom on its own row." ]},
+  { ver:"1.1.0 beta 7", date:"Jul 20, 2026", time:"11:18 PM", notes:[
     "Redesigned the plate calculator into a two-way tool with a header icon.",
     "Fixed the Custom buttons in Settings (they wouldn't stay selected).",
-    "Interval lead-in row: None / 3 / 5 / 10 with Custom on its own row." ]},
-  { ver:"1.1.0 beta 6", date:"Jul 20, 2026", notes:[
+    "Made the Settings option rows uniform." ]},
+  { ver:"1.1.0 beta 6", date:"Jul 20, 2026", time:"11:08 PM", notes:[
     "Moved Settings and Program & Data onto their own pages.",
     "Settings options shown as buttons; barbell weight defaults to 45 lb.",
     "Plate math changed to tap-to-view per set." ]},
-  { ver:"1.1.0 beta 5", date:"Jul 20, 2026", notes:[
+  { ver:"1.1.0 beta 5", date:"Jul 20, 2026", time:"10:56 PM", notes:[
     "Added the plate calculator (per-side breakdown).",
     "Added the cardio interval timer.",
     "Added the Settings section (barbell weight, interval lead-in)." ]},
-  { ver:"1.1.0 beta 4", date:"Jul 20, 2026", notes:[
+  { ver:"1.1.0 beta 4", date:"Jul 20, 2026", time:"10:49 PM", notes:[
     "Rest timer now survives leaving the app and recalculates on return.",
     "Added sound + vibration when rest ends.",
     "Changed the copy-set arrow to point down." ]},
-  { ver:"1.1.0 beta 3", date:"Jul 20, 2026", notes:[
+  { ver:"1.1.0 beta 3", date:"Jul 20, 2026", time:"10:42 PM", notes:[
     "Added the copy-previous-set button.",
     "Made the Date field smaller." ]},
-  { ver:"1.1.0 beta 2", date:"Jul 20, 2026", notes:[
+  { ver:"1.1.0 beta 2", date:"Jul 20, 2026", time:"10:38 PM", notes:[
     "Added the version history / changelog page.",
     "Removed the Energy field." ]},
-  { ver:"1.1.0 beta 1", date:"Jul 20, 2026", notes:[
+  { ver:"1.1.0 beta 1", date:"Jul 20, 2026", time:"10:21 PM", notes:[
     "Added “last time” ghost data.",
     "Added progress charts.",
     "Removed weight (load) tracking temporarily." ]}
@@ -588,7 +599,7 @@ const DEFAULT_PROGRAM = { days: [
 /* ============ state ============ */
 let program = null;
 let sessions = [];
-let settings = { bar:45, lead:5 };
+let settings = { bar:45, lead:5, showTimes:false };
 let cur = null;          // current session being edited
 let curDay = null;       // day object
 let editingId = null;    // session id if editing a saved one
@@ -669,6 +680,12 @@ function wireSettings(){
     };
   });
   leadCustom.oninput=()=>{ const v=parseInt(leadCustom.value,10); if(isFinite(v)&&v>=0){ settings.lead=v; saveSettings(); } };
+
+  const tt=$("#setTimes");
+  if(tt){
+    tt.classList.toggle("on", !!settings.showTimes);
+    tt.onclick=()=>{ settings.showTimes=!settings.showTimes; tt.classList.toggle("on",settings.showTimes); saveSettings(); };
+  }
 
   paintBar(); paintLead();
 }
@@ -798,15 +815,18 @@ function openChangelog(){
   showView("log-history");
   $("#title").textContent = "What's new";
   $("#subtitle").textContent = "Version history";
-  const entry = c => `
+  const entry = c => {
+    const dateStr = (settings.showTimes && c.time) ? `${esc(c.date)} · ${esc(c.time)}` : esc(c.date);
+    return `
     <div class="clog-entry ${c.tag==='current'?'cur':''}">
       <div class="clog-head">
         <span class="clog-ver">${esc(c.ver)}</span>
         ${c.tag==='current'?'<span class="clog-tag">current</span>':''}
-        <span class="clog-date">${esc(c.date)}</span>
+        <span class="clog-date">${dateStr}</span>
       </div>
       <ul>${c.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>
     </div>`;
+  };
   const betaDetails = `
     <details class="beta-notes">
       <summary>View 1.1.0 beta notes</summary>
