@@ -21,6 +21,26 @@
     --wkd:#7A4A9E; --wkd-l:#EFE6F7;
     --accent:var(--mon); --accent-l:var(--mon-l);
   }
+  /* explicit choices via data-theme on <html> */
+  html[data-theme="dark"]{
+    --bg:#121316; --card:#1D1F23; --ink:#ECECEE; --muted:#9A9CA3;
+    --line:#33363C; --ok:#3FBF74;
+    --mon:#E06248; --mon-l:#3A241F;
+    --wed:#4FB587; --wed-l:#1E322A;
+    --fri:#6699F0; --fri-l:#1E2A44;
+    --wkd:#B084DC; --wkd-l:#2E2440;
+  }
+  /* device mode: follow the OS only when no explicit choice is set */
+  @media (prefers-color-scheme: dark){
+    html[data-theme="device"]{
+      --bg:#121316; --card:#1D1F23; --ink:#ECECEE; --muted:#9A9CA3;
+      --line:#33363C; --ok:#3FBF74;
+      --mon:#E06248; --mon-l:#3A241F;
+      --wed:#4FB587; --wed-l:#1E322A;
+      --fri:#6699F0; --fri-l:#1E2A44;
+      --wkd:#B084DC; --wkd-l:#2E2440;
+    }
+  }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
@@ -315,6 +335,14 @@
 
   <!-- SETTINGS -->
   <div class="view" id="view-settings">
+    <h2>Appearance</h2>
+    <div class="optrow" id="themeOpts">
+      <button class="opt" data-theme-opt="light">Light</button>
+      <button class="opt" data-theme-opt="dark">Dark</button>
+      <button class="opt" data-theme-opt="device">Match device</button>
+    </div>
+    <p class="settings-note">“Match device” follows your phone's light/dark setting automatically.</p>
+
     <h2>Barbell weight</h2>
     <div class="optrow" id="barOpts">
       <button class="opt" data-bar="45">45 lb</button>
@@ -469,9 +497,12 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.1";
+const APP_VERSION = "1.1.2";
 const CHANGELOG = [
-  { ver:"1.1.1", date:"Jul 20, 2026", time:"11:54 PM", tag:"current", notes:[
+  { ver:"1.1.2", date:"Jul 21, 2026", time:"12:05 AM", tag:"current", notes:[
+    "Added dark mode — choose Light, Dark, or Match device in Settings under Appearance.",
+    "“Match device” follows your phone's system light/dark setting automatically and updates live." ]},
+  { ver:"1.1.1", date:"Jul 20, 2026", time:"11:54 PM", notes:[
     "Added release times to the changelog, with a toggle in Settings to show or hide them (off by default).",
     "Added the previously-missing beta 8 to the version history." ]},
   { ver:"1.1.0", date:"Jul 20, 2026", time:"11:40 PM", notes:[
@@ -599,7 +630,7 @@ const DEFAULT_PROGRAM = { days: [
 /* ============ state ============ */
 let program = null;
 let sessions = [];
-let settings = { bar:45, lead:5, showTimes:false };
+let settings = { bar:45, lead:5, showTimes:false, theme:"device" };
 let cur = null;          // current session being edited
 let curDay = null;       // day object
 let editingId = null;    // session id if editing a saved one
@@ -612,9 +643,43 @@ const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">"
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show");
   clearTimeout(t._to); t._to=setTimeout(()=>t.classList.remove("show"),2400); }
 
+/* map the light-mode day hex colors to their dark-mode equivalents */
+const DARK_MAP = {
+  "#B3402A":"#E06248", "#F7E6E1":"#3A241F",
+  "#2A6B4F":"#4FB587", "#E3F0EA":"#1E322A",
+  "#2A4E8F":"#6699F0", "#E4EAF6":"#1E2A44",
+  "#7A4A9E":"#B084DC", "#EFE6F7":"#2E2440"
+};
+function isDarkActive(){
+  const t = document.documentElement.getAttribute("data-theme");
+  if(t==="dark") return true;
+  if(t==="light") return false;
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function themeColor(hex){
+  return (isDarkActive() && DARK_MAP[(hex||"").toUpperCase()]) || hex;
+}
 function setAccent(day){
-  document.documentElement.style.setProperty("--accent", day?day.accent:"#B3402A");
-  document.documentElement.style.setProperty("--accent-l", day?day.light:"#F7E6E1");
+  const a = day ? day.accent : "#B3402A";
+  const l = day ? day.light  : "#F7E6E1";
+  document.documentElement.style.setProperty("--accent", themeColor(a));
+  document.documentElement.style.setProperty("--accent-l", themeColor(l));
+}
+
+/* ============ theme ============ */
+function applyTheme(){
+  const mode = settings.theme || "device";
+  document.documentElement.setAttribute("data-theme", mode);
+  // refresh inline accent colors for whatever view is active
+  const active = document.querySelector(".view.active");
+  if(active && active.id==="view-chart") setAccent({accent:"#2A4E8F",light:"#E4EAF6"});
+  else if(active && active.id==="view-log" && curDay) setAccent(curDay);
+  else setAccent(null);
+}
+if(window.matchMedia){
+  try{ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
+    if((settings.theme||"device")==="device"){ applyTheme(); if(typeof renderHome==="function") renderHome(); }
+  }); }catch(e){}
 }
 
 /* ============ init ============ */
@@ -633,6 +698,7 @@ async function checkPersistence(){
   sessions = (await store.get("sessions")) || [];
   const savedSettings = await store.get("settings");
   if(savedSettings) settings = Object.assign(settings, savedSettings);
+  applyTheme();
   if(!(await checkPersistence())) $("#storageBanner").style.display = "block";
   wireSettings();
   renderHome();
@@ -686,6 +752,15 @@ function wireSettings(){
     tt.classList.toggle("on", !!settings.showTimes);
     tt.onclick=()=>{ settings.showTimes=!settings.showTimes; tt.classList.toggle("on",settings.showTimes); saveSettings(); };
   }
+
+  function paintTheme(){
+    $("#themeOpts").querySelectorAll(".opt").forEach(b=>
+      b.classList.toggle("on", b.dataset.themeOpt===(settings.theme||"device")));
+  }
+  $("#themeOpts").querySelectorAll(".opt").forEach(b=>{
+    b.onclick=()=>{ settings.theme=b.dataset.themeOpt; saveSettings(); applyTheme(); paintTheme(); };
+  });
+  paintTheme();
 
   paintBar(); paintLead();
 }
@@ -764,7 +839,7 @@ function renderHome(){
       or restore a backup to get started.</div>`;
   } else {
   dl.innerHTML = program.days.map((d,i)=>`
-    <div class="daycard" data-day="${d.id}" style="--dc:${d.accent};--dcl:${d.light}">
+    <div class="daycard" data-day="${d.id}" style="--dc:${themeColor(d.accent)};--dcl:${themeColor(d.light)}">
       <div><div class="dc-name">${esc(d.name)}</div>
       <div class="dc-focus">${esc(d.focus)}</div></div>
       <div class="dc-time">${esc(d.total||"")}</div>
@@ -778,7 +853,7 @@ function renderHome(){
     rl.innerHTML = sessions.slice().sort((a,b)=>b.savedAt-a.savedAt).slice(0,12).map(s=>{
       const d = program ? program.days.find(x=>x.id===s.dayId) : null;
       const done = Object.values(s.sets||{}).flat().filter(x=>x&&x.done).length;
-      return `<div class="sess" data-id="${s.id}" style="--dc:${d?d.accent:"#999"}">
+      return `<div class="sess" data-id="${s.id}" style="--dc:${d?themeColor(d.accent):"#999"}">
         <div class="dot"></div>
         <div class="s-main"><div class="s-day">${esc(s.dayName||d?.name||"Workout")}</div>
         <div class="s-meta">${esc(s.date)}${sessionVolume(s)?" · "+sessionVolume(s)+" sets logged":""}</div></div>
