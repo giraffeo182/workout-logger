@@ -69,7 +69,7 @@
     border-radius:14px;padding:16px;text-align:center;}
 
   /* log view */
-  .meta{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;margin-bottom:6px;}
+  .meta{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-bottom:6px;}
   .field label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;
     letter-spacing:.08em;color:var(--muted);margin-bottom:4px;}
   .field input,.field textarea{width:100%;font-size:16px;padding:10px;border-radius:12px;
@@ -106,7 +106,25 @@
   .setrow .sn{font-size:11px;font-weight:800;color:var(--muted);text-align:center;}
   .setrow input{width:100%;font-size:16px;font-weight:700;text-align:center;padding:10px 4px;
     border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--ink);}
+  .setrow input::placeholder{color:var(--accent);opacity:.5;font-weight:600;font-style:italic;}
   .setrow .x{color:var(--muted);text-align:center;font-weight:700;}
+  .lasttime{font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-l);
+    border-radius:8px;padding:5px 9px;margin:0 0 9px;display:inline-block;}
+  select{width:100%;font-size:16px;padding:11px;border-radius:12px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);font-family:inherit;font-weight:600;
+    -webkit-appearance:none;appearance:none;}
+  .progcard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:16px;cursor:pointer;}
+  .progcard .pc-t{font-weight:800;font-size:15px;}
+  .progcard .pc-s{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .progcard .chev{margin-left:auto;color:var(--muted);font-size:22px;}
+  .chartcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 12px 12px;}
+  .chartcard h3{margin:0 0 2px;font-size:15px;}
+  .chartcard .csub{font-size:12px;color:var(--muted);margin:0 0 12px;}
+  .chartcard svg{width:100%;height:auto;display:block;}
+  .chartstat{display:flex;gap:16px;margin-top:10px;padding-top:12px;border-top:1px solid var(--line);}
+  .chartstat div{font-size:12px;color:var(--muted);}
+  .chartstat b{display:block;font-size:18px;color:var(--ink);font-weight:800;}
   .setdone{width:44px;height:44px;border-radius:11px;border:1.5px solid var(--line);
     background:var(--card);font-size:17px;color:transparent;cursor:pointer;}
   .setdone.on{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -193,6 +211,9 @@
     <h2>Recent sessions</h2>
     <div id="recentList"></div>
 
+    <h2>Progress</h2>
+    <div id="progressLink"></div>
+
     <h2>Program</h2>
     <div class="btnrow">
       <button class="btn" id="importBtn">Import program PDF</button>
@@ -217,7 +238,6 @@
   <div class="view" id="view-log">
     <div class="meta">
       <div class="field"><label>Date</label><input type="date" id="f-date"></div>
-      <div class="field"><label>Bodyweight</label><input inputmode="decimal" id="f-bw" placeholder="lb"></div>
       <div class="field"><label>Energy 1–10</label><input inputmode="numeric" id="f-energy" placeholder="7"></div>
     </div>
     <div class="warm" id="warmBox"></div>
@@ -229,7 +249,14 @@
     <div class="minbox" id="minBox"></div>
   </div>
 
-  <!-- HISTORY (session viewer reuses log view) -->
+  <!-- CHART -->
+  <div class="view" id="view-chart">
+    <div class="field" style="margin-bottom:14px">
+      <label>Exercise</label>
+      <select id="chartPick"></select>
+    </div>
+    <div id="chartWrap"></div>
+  </div>
 </div>
 
 <div class="finishbar" id="finishbar" style="display:none">
@@ -400,11 +427,103 @@ function renderHome(){
       return `<div class="sess" data-id="${s.id}" style="--dc:${d?d.accent:"#999"}">
         <div class="dot"></div>
         <div class="s-main"><div class="s-day">${esc(s.dayName||d?.name||"Workout")}</div>
-        <div class="s-meta">${esc(s.date)}${s.bodyweight?" · "+esc(s.bodyweight)+" lb":""}${s.energy?" · energy "+esc(s.energy):""}</div></div>
+        <div class="s-meta">${esc(s.date)}${s.energy?" · energy "+esc(s.energy):""}${sessionVolume(s)?" · "+sessionVolume(s)+" sets logged":""}</div></div>
         <div class="s-count">${done} sets</div></div>`;
     }).join("");
     rl.querySelectorAll(".sess").forEach(el=>el.onclick=()=>openSession(el.dataset.id));
   }
+
+  // progress link
+  const pl = $("#progressLink");
+  const loggedCount = sessions.filter(s=>sessionVolume(s)>0).length;
+  if(loggedCount < 2){
+    pl.innerHTML = `<div class="empty">Charts appear once you've logged an exercise at least twice. Keep going!</div>`;
+  } else {
+    pl.innerHTML = `<div class="progcard" id="openChart">
+      <div><div class="pc-t">View progress charts</div>
+      <div class="pc-s">Top-set weight over time, per exercise</div></div>
+      <div class="chev">›</div></div>`;
+    $("#openChart").onclick = openChart;
+  }
+}
+
+/* ============ PROGRESS CHARTS ============ */
+function exerciseHistory(){
+  // map exercise name -> [{date, savedAt, top, e1rm}] across all sessions
+  const map = {};
+  sessions.slice().sort((a,b)=>a.savedAt-b.savedAt).forEach(s=>{
+    const d = program && program.days.find(x=>x.id===s.dayId);
+    if(!d) return;
+    d.exercises.forEach((ex,idx)=>{
+      const arr = (s.sets||{})[idx]; if(!arr) return;
+      let top=0, e1rm=0;
+      arr.forEach(x=>{
+        const w=parseFloat(x&&x.w), r=parseFloat(x&&x.r);
+        if(isFinite(w)&&w>0){
+          if(w>top) top=w;
+          const est = isFinite(r)&&r>0 ? w*(1+r/30) : w;   // Epley
+          if(est>e1rm) e1rm=est;
+        }
+      });
+      if(top>0){
+        (map[ex.name] = map[ex.name]||[]).push({date:s.date, savedAt:s.savedAt, top, e1rm:Math.round(e1rm)});
+      }
+    });
+  });
+  // keep only exercises with 2+ data points
+  Object.keys(map).forEach(k=>{ if(map[k].length<2) delete map[k]; });
+  return map;
+}
+let chartData = {};
+function openChart(){
+  chartData = exerciseHistory();
+  const names = Object.keys(chartData);
+  showView("chart");
+  $("#title").textContent = "Progress";
+  $("#subtitle").textContent = names.length + " exercises tracked";
+  const sel = $("#chartPick");
+  sel.innerHTML = names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.onchange = ()=>drawChart(sel.value);
+  if(names.length) drawChart(names[0]);
+  else $("#chartWrap").innerHTML = `<div class="empty">No exercises with enough data yet.</div>`;
+}
+function drawChart(name){
+  const data = chartData[name]||[];
+  const W=320, H=180, pad=32;
+  const xs = data.map((_,i)=>i);
+  const ys = data.map(d=>d.top);
+  const ymin = Math.min(...ys), ymax = Math.max(...ys);
+  const span = (ymax-ymin)||1;
+  const lo = ymin - span*0.15, hi = ymax + span*0.15;
+  const px = i => pad + (data.length===1?0.5:i/(data.length-1))*(W-pad-8);
+  const py = v => H-pad - ((v-lo)/(hi-lo))*(H-pad-12);
+  const line = data.map((d,i)=>`${i?"L":"M"}${px(i).toFixed(1)},${py(d.top).toFixed(1)}`).join(" ");
+  const dots = data.map((d,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(d.top).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join("");
+  // y gridlines
+  const gl = [lo, (lo+hi)/2, hi].map(v=>{
+    const y=py(v).toFixed(1);
+    return `<line x1="${pad}" y1="${y}" x2="${W-8}" y2="${y}" stroke="var(--line)" stroke-width="1"/>
+      <text x="${pad-6}" y="${(+y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--muted)">${Math.round(v)}</text>`;
+  }).join("");
+  // x labels: first & last date
+  const xlab = `<text x="${px(0)}" y="${H-10}" font-size="9" fill="var(--muted)">${esc(data[0].date.slice(5))}</text>
+    <text x="${W-8}" y="${H-10}" text-anchor="end" font-size="9" fill="var(--muted)">${esc(data[data.length-1].date.slice(5))}</text>`;
+  const first=ys[0], last=ys[ys.length-1];
+  const delta = last-first;
+  const bestE = Math.max(...data.map(d=>d.e1rm));
+  $("#chartWrap").innerHTML = `<div class="chartcard">
+    <h3>${esc(name)}</h3>
+    <p class="csub">Heaviest set each session (${data.length} sessions)</p>
+    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      ${gl}
+      <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}${xlab}
+    </svg>
+    <div class="chartstat">
+      <div>Current top<b>${last}</b></div>
+      <div>Change<b style="color:${delta>=0?'var(--ok)':'#B3402A'}">${delta>=0?'+':''}${delta}</b></div>
+      <div>Best est. 1RM<b>${bestE}</b></div>
+    </div></div>`;
 }
 
 /* ============ LOG VIEW ============ */
@@ -427,7 +546,7 @@ function newSession(day){
   const sets = {};
   day.exercises.forEach((ex,i)=>{ sets[i] = Array.from({length:ex.sets},()=>({w:"",r:"",done:false})); });
   return { id:"s_"+Date.now(), dayId:day.id, dayName:day.name,
-    date:new Date().toISOString().slice(0,10), bodyweight:"", energy:"",
+    date:new Date().toISOString().slice(0,10), energy:"",
     sets, cardioDone:false, notes:"", savedAt:Date.now() };
 }
 
@@ -441,7 +560,7 @@ function renderLog(){
   $("#deleteBtn").style.display = editingId ? "inline-block" : "none";
   $("#finishBtn").textContent = editingId ? "Save changes" : "Finish workout";
 
-  $("#f-date").value = cur.date; $("#f-bw").value = cur.bodyweight;
+  $("#f-date").value = cur.date;
   $("#f-energy").value = cur.energy; $("#f-notes").value = cur.notes;
   $("#warmBox").innerHTML = `<b>Warm-up</b>${esc(curDay.warmup||"")}`;
   $("#minBox").innerHTML = `<b>Low-motivation day?</b> Minimum that still counts: ${esc(curDay.minimum||"first lift + one finisher")}. Never zero.`;
@@ -480,23 +599,59 @@ function renderLog(){
   });
   const ct = $("#cardioT");
   if(ct) ct.onclick = ()=>{ cur.cardioDone=!cur.cardioDone; ct.classList.toggle("on",cur.cardioDone); queueDraft(); };
-  ["f-date","f-bw","f-energy","f-notes"].forEach(id=>{
-    $("#"+id).oninput = e=>{ const map={"f-date":"date","f-bw":"bodyweight","f-energy":"energy","f-notes":"notes"};
+  ["f-date","f-energy","f-notes"].forEach(id=>{
+    $("#"+id).oninput = e=>{ const map={"f-date":"date","f-energy":"energy","f-notes":"notes"};
       cur[map[id]] = e.target.value; queueDraft(); };
   });
   window.scrollTo(0,0);
 }
 
+function sessionVolume(s){
+  return Object.values(s.sets||{}).flat().filter(x=>x&&(x.w||x.r)).length;
+}
+/* most recent SAVED session for this day, excluding the one being edited */
+function lastSessionFor(dayId){
+  const prior = sessions
+    .filter(s=>s.dayId===dayId && s.id!==(editingId||cur&&cur.id))
+    .sort((a,b)=>b.savedAt-a.savedAt);
+  return prior[0] || null;
+}
+/* pull an exercise's logged sets from a past session, matched by name */
+function pastSetsFor(pastSession, ex){
+  if(!pastSession) return null;
+  const pd = program.days.find(d=>d.id===pastSession.dayId);
+  if(!pd) return null;
+  let idx = pd.exercises.findIndex(e=>e.name===ex.name);
+  if(idx<0) idx = pd.exercises.findIndex(e=>e.label===ex.label);
+  if(idx<0) return null;
+  const arr = (pastSession.sets||{})[idx];
+  if(!arr) return null;
+  const logged = arr.filter(x=>x&&(x.w||x.r));
+  return logged.length ? {sets:arr, date:pastSession.date} : null;
+}
+
 function exCard(ex, i){
   const sets = cur.sets[i] || [];
-  const rows = sets.map((s,j)=>`
+  const past = pastSetsFor(lastSessionFor(cur.dayId), ex);
+  const rows = sets.map((s,j)=>{
+    const p = past && past.sets[j];
+    const gw = p && p.w ? p.w : "wt";
+    const gr = p && p.r ? p.r : "reps";
+    return `
     <div class="setrow">
       <div class="sn">${j+1}</div>
-      <input inputmode="decimal" placeholder="wt" value="${esc(s.w)}" data-ex="${i}" data-set="${j}" data-f="w">
+      <input inputmode="decimal" placeholder="${esc(gw)}" value="${esc(s.w)}" data-ex="${i}" data-set="${j}" data-f="w">
       <div class="x">×</div>
-      <input inputmode="numeric" placeholder="reps" value="${esc(s.r)}" data-ex="${i}" data-set="${j}" data-f="r">
+      <input inputmode="numeric" placeholder="${esc(gr)}" value="${esc(s.r)}" data-ex="${i}" data-set="${j}" data-f="r">
       <button class="setdone ${s.done?"on":""}" data-ex="${i}" data-set="${j}" aria-label="Set done">✓</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
+  let lastLine = "";
+  if(past){
+    const summ = past.sets.filter(x=>x&&(x.w||x.r))
+      .map(x=>`${x.w||"?"}×${x.r||"?"}`).join(", ");
+    lastLine = `<div class="lasttime">Last time (${esc(past.date)}): ${esc(summ)}</div>`;
+  }
   return `<div class="ex">
     <div class="ex-top"><span class="ex-label">${esc(ex.label)}</span>
       <div class="ex-name">${esc(ex.name)}</div>
@@ -505,6 +660,7 @@ function exCard(ex, i){
       <span class="spec">Target <b>${esc(ex.target)}</b></span>
       <span class="spec">Load <b>${esc(ex.load)}</b></span>
       <span class="spec">Rest <b>${esc(ex.rest)}</b></span></div>
+    ${lastLine}
     ${rows}</div>`;
 }
 
@@ -563,7 +719,8 @@ function showView(v){
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
   $("#view-"+v).classList.add("active");
   $("#backBtn").style.display = v==="home" ? "none" : "block";
-  if(v==="home"){ $("#exportBtn").style.display="none"; $("#finishbar").style.display="none"; setAccent(null); }
+  if(v!=="log"){ $("#exportBtn").style.display="none"; $("#finishbar").style.display="none"; }
+  if(v!=="log") setAccent(v==="chart"?{accent:"#2A4E8F",light:"#E4EAF6"}:null);
 }
 function goHome(){ cur=null; curDay=null; editingId=null; stopTimer(); renderHome(); }
 $("#backBtn").onclick = goHome;
@@ -579,7 +736,7 @@ $("#exportBtn").onclick = ()=>{
   doc.text(curDay.name.toUpperCase(), W/2, 52, {align:"center"});
   doc.setFontSize(10.5); doc.setTextColor(110);
   doc.setFont("helvetica","normal");
-  doc.text(`${curDay.focus}  •  ${cur.date}  •  BW: ${cur.bodyweight||"—"}  •  Energy: ${cur.energy||"—"}/10`, W/2, 68, {align:"center"});
+  doc.text(`${curDay.focus}  •  ${cur.date}  •  Energy: ${cur.energy||"—"}/10`, W/2, 68, {align:"center"});
 
   const maxSets = Math.max(...curDay.exercises.map(e=>e.sets));
   const head = [["","Exercise","Target","Load / RPE"].concat(
