@@ -69,13 +69,15 @@
     border-radius:14px;padding:16px;text-align:center;}
 
   /* log view */
-  .meta{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-bottom:6px;}
+  .meta{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-bottom:6px;align-items:end;}
   .field label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;
     letter-spacing:.08em;color:var(--muted);margin-bottom:4px;}
-  .field input,.field textarea{width:100%;font-size:16px;padding:10px;border-radius:12px;
-    border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;}
-  .field textarea{min-height:64px;resize:vertical;}
-  input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent;}
+  .field input,.field textarea{width:100%;font-size:16px;padding:12px;border-radius:12px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit;
+    box-sizing:border-box;height:48px;line-height:1.2;}
+  .meta .field input{text-align:center;}
+  .field textarea{min-height:64px;height:auto;resize:vertical;text-align:left;}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent;}
 
   .warm{background:var(--accent-l);border-radius:14px;padding:12px 14px;font-size:13px;
     line-height:1.45;margin:10px 0 4px;}
@@ -125,6 +127,20 @@
   .chartstat{display:flex;gap:16px;margin-top:10px;padding-top:12px;border-top:1px solid var(--line);}
   .chartstat div{font-size:12px;color:var(--muted);}
   .chartstat b{display:block;font-size:18px;color:var(--ink);font-weight:800;}
+  .verfoot{text-align:center;margin:34px 0 8px;font-size:12px;color:var(--muted);
+    font-weight:600;cursor:pointer;}
+  .verfoot span{border-bottom:1px dotted var(--muted);padding-bottom:1px;}
+  .clog{margin-bottom:6px;}
+  .clog-entry{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;margin-bottom:10px;}
+  .clog-entry.cur{border-color:var(--accent);border-width:1.5px;}
+  .clog-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;}
+  .clog-ver{font-weight:800;font-size:16px;}
+  .clog-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+    background:var(--accent);color:#fff;padding:2px 7px;border-radius:99px;}
+  .clog-date{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600;}
+  .clog-entry ul{margin:0;padding-left:18px;}
+  .clog-entry li{font-size:13.5px;line-height:1.6;color:var(--ink);}
   .setdone{width:44px;height:44px;border-radius:11px;border:1.5px solid var(--line);
     background:var(--card);font-size:17px;color:transparent;cursor:pointer;}
   .setdone.on{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -232,6 +248,8 @@
       you can keep in iCloud/Files. Restore loads it back — on this phone or any other.</p>
     <input type="file" id="pdfFile" accept="application/pdf" style="display:none">
     <input type="file" id="jsonFile" accept=".json,application/json" style="display:none">
+
+    <div class="verfoot" id="verFoot"></div>
   </div>
 
   <!-- LOG -->
@@ -256,6 +274,11 @@
       <select id="chartPick"></select>
     </div>
     <div id="chartWrap"></div>
+  </div>
+
+  <!-- CHANGELOG -->
+  <div class="view" id="view-log-history">
+    <div id="changelogWrap"></div>
   </div>
 </div>
 
@@ -290,6 +313,24 @@
 </div>
 
 <script>
+/* ============ version + changelog ============ */
+const APP_VERSION = "1.1.0 beta 1";
+const CHANGELOG = [
+  { ver:"1.1.0 beta 1", date:"Jul 21, 2026", tag:"current", notes:[
+    "Added “last time” ghost data — each exercise shows your previous session's weights and reps as hints.",
+    "Added progress charts: top-set weight over time, per exercise.",
+    "Removed weight (load) tracking for now — coming back in a later 1.1.0 build.",
+    "Fixed the Date / Energy field alignment at the top of a workout." ]},
+  { ver:"1.0.2", date:"Jul 19, 2026", notes:[
+    "Removed the baked-in default workout — the app now starts empty until you import a program.",
+    "Added backup export & restore, and PDF program import.",
+    "Added a storage-blocked warning so data loss can't happen silently." ]},
+  { ver:"1.0.1", date:"Jul 19, 2026", notes:[
+    "Added the home-screen app icon." ]},
+  { ver:"1.0", date:"Jul 19, 2026", notes:[
+    "Initial launch — log sets, reps, and notes; rest timer; save sessions; export a filled PDF." ]}
+];
+
 /* ============ storage adapter: window.storage -> localStorage -> memory ============ */
 const mem = {};
 const store = {
@@ -445,6 +486,27 @@ function renderHome(){
       <div class="chev">›</div></div>`;
     $("#openChart").onclick = openChart;
   }
+
+  // version footer
+  const vf = $("#verFoot");
+  vf.innerHTML = `<span>Version ${esc(APP_VERSION)} — what's new</span>`;
+  vf.onclick = openChangelog;
+}
+
+/* ============ CHANGELOG ============ */
+function openChangelog(){
+  showView("log-history");
+  $("#title").textContent = "What's new";
+  $("#subtitle").textContent = "Version history";
+  $("#changelogWrap").innerHTML = `<div class="clog">` + CHANGELOG.map(c=>`
+    <div class="clog-entry ${c.tag==='current'?'cur':''}">
+      <div class="clog-head">
+        <span class="clog-ver">${esc(c.ver)}</span>
+        ${c.tag==='current'?'<span class="clog-tag">current</span>':''}
+        <span class="clog-date">${esc(c.date)}</span>
+      </div>
+      <ul>${c.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>
+    </div>`).join("") + `</div>`;
 }
 
 /* ============ PROGRESS CHARTS ============ */
