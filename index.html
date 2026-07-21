@@ -70,6 +70,7 @@
 
   /* log view */
   .meta{margin-bottom:6px;}
+  .meta .field input{max-width:200px;}
   .field label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;
     letter-spacing:.08em;color:var(--muted);margin-bottom:4px;}
   .field input,.field textarea{width:100%;font-size:16px;padding:10px;border-radius:12px;
@@ -102,13 +103,18 @@
     padding:4px 8px;border-radius:99px;color:var(--muted);}
   .spec b{color:var(--ink);}
 
-  .setrow{display:grid;grid-template-columns:34px 1fr 22px 1fr 44px;gap:7px;align-items:center;
+  .setrow{display:grid;grid-template-columns:26px 1fr 18px 1fr 40px 34px;gap:6px;align-items:center;
     margin-bottom:7px;}
   .setrow .sn{font-size:11px;font-weight:800;color:var(--muted);text-align:center;}
   .setrow input{width:100%;font-size:16px;font-weight:700;text-align:center;padding:10px 4px;
     border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--ink);}
   .setrow input::placeholder{color:var(--accent);opacity:.5;font-weight:600;font-style:italic;}
   .setrow .x{color:var(--muted);text-align:center;font-weight:700;}
+  .setcopy{width:34px;height:40px;border-radius:10px;border:1px solid var(--line);
+    background:var(--card);font-size:15px;color:var(--muted);cursor:pointer;padding:0;
+    display:flex;align-items:center;justify-content:center;}
+  .setcopy:active{background:var(--accent-l);}
+  .setcopy.hidden{visibility:hidden;}
   .lasttime{font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-l);
     border-radius:8px;padding:5px 9px;margin:0 0 9px;display:inline-block;}
   select{width:100%;font-size:16px;padding:11px;border-radius:12px;border:1px solid var(--line);
@@ -140,7 +146,7 @@
   .clog-date{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600;}
   .clog-entry ul{margin:0;padding-left:18px;}
   .clog-entry li{font-size:13.5px;line-height:1.6;color:var(--ink);}
-  .setdone{width:44px;height:44px;border-radius:11px;border:1.5px solid var(--line);
+  .setdone{width:40px;height:40px;border-radius:11px;border:1.5px solid var(--line);
     background:var(--card);font-size:17px;color:transparent;cursor:pointer;}
   .setdone.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 
@@ -312,13 +318,18 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.0 beta 1";
+const APP_VERSION = "1.1.0 beta 3";
 const CHANGELOG = [
-  { ver:"1.1.0 beta 1", date:"Jul 21, 2026", tag:"current", notes:[
+  { ver:"1.1.0 beta 3", date:"Jul 22, 2026", tag:"current", notes:[
+    "Added a “copy previous set” button — fill a set with the same weight and reps as the set above it in one tap.",
+    "Made the Date field smaller so it no longer stretches across the whole screen." ]},
+  { ver:"1.1.0 beta 2", date:"Jul 21, 2026", notes:[
+    "Added this version history / changelog page.",
+    "Removed the Energy field and cleaned up the top of a workout." ]},
+  { ver:"1.1.0 beta 1", date:"Jul 21, 2026", notes:[
     "Added “last time” ghost data — each exercise shows your previous session's weights and reps as hints.",
     "Added progress charts: top-set weight over time, per exercise.",
-    "Removed weight (load) tracking for now — coming back in a later 1.1.0 build.",
-    "Removed the Energy field and cleaned up the top of a workout." ]},
+    "Removed weight (load) tracking for now — coming back in a later 1.1.0 build." ]},
   { ver:"1.0.2", date:"Jul 19, 2026", notes:[
     "Removed the baked-in default workout — the app now starts empty until you import a program.",
     "Added backup export & restore, and PDF program import.",
@@ -657,6 +668,21 @@ function renderLog(){
       s.done=!s.done; btn.classList.toggle("on",s.done);
       if(s.done) startTimer(curDay.exercises[ex]); queueDraft(); };
   });
+  $("#exList").querySelectorAll(".setcopy").forEach(btn=>{
+    btn.onclick = ()=>{
+      const ex = btn.dataset.copyEx, set = +btn.dataset.copySet;
+      if(set<1) return;
+      const prev = cur.sets[ex][set-1], tgt = cur.sets[ex][set];
+      tgt.w = prev.w; tgt.r = prev.r;
+      // update this row's two inputs live without a full re-render
+      const row = btn.closest(".setrow");
+      const wIn = row.querySelector('input[data-f="w"]');
+      const rIn = row.querySelector('input[data-f="r"]');
+      if(wIn) wIn.value = prev.w;
+      if(rIn) rIn.value = prev.r;
+      queueDraft();
+    };
+  });
   const ct = $("#cardioT");
   if(ct) ct.onclick = ()=>{ cur.cardioDone=!cur.cardioDone; ct.classList.toggle("on",cur.cardioDone); queueDraft(); };
   ["f-date","f-notes"].forEach(id=>{
@@ -704,6 +730,7 @@ function exCard(ex, i){
       <div class="x">×</div>
       <input inputmode="numeric" placeholder="${esc(gr)}" value="${esc(s.r)}" data-ex="${i}" data-set="${j}" data-f="r">
       <button class="setdone ${s.done?"on":""}" data-ex="${i}" data-set="${j}" aria-label="Set done">✓</button>
+      <button class="setcopy ${j===0?"hidden":""}" data-copy-ex="${i}" data-copy-set="${j}" aria-label="Copy set above" title="Same as set above">↑</button>
     </div>`;
   }).join("");
   let lastLine = "";
