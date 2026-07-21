@@ -318,9 +318,14 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.0 beta 3";
+const APP_VERSION = "1.1.0 beta 4";
 const CHANGELOG = [
-  { ver:"1.1.0 beta 3", date:"Jul 22, 2026", tag:"current", notes:[
+  { ver:"1.1.0 beta 4", date:"Jul 22, 2026", tag:"current", notes:[
+    "Rest timer now survives leaving the app — reopen it and it shows the correct time left (or GO!) instead of a frozen number.",
+    "Added a sound + vibration when rest ends while the app is open.",
+    "Changed the copy-set arrow to point down.",
+    "Note: a true background alert while you're in another app (or on the Dynamic Island) isn't possible for a home-screen web app without a push server — this gets as close as the web allows." ]},
+  { ver:"1.1.0 beta 3", date:"Jul 22, 2026", notes:[
     "Added a “copy previous set” button — fill a set with the same weight and reps as the set above it in one tap.",
     "Made the Date field smaller so it no longer stretches across the whole screen." ]},
   { ver:"1.1.0 beta 2", date:"Jul 21, 2026", notes:[
@@ -666,7 +671,8 @@ function renderLog(){
   $("#exList").querySelectorAll(".setdone").forEach(btn=>{
     btn.onclick = ()=>{ const {ex,set}=btn.dataset; const s=cur.sets[ex][set];
       s.done=!s.done; btn.classList.toggle("on",s.done);
-      if(s.done) startTimer(curDay.exercises[ex]); queueDraft(); };
+      if(s.done){ unlockAudio(); askNotifyOnce(); startTimer(curDay.exercises[ex]); }
+      queueDraft(); };
   });
   $("#exList").querySelectorAll(".setcopy").forEach(btn=>{
     btn.onclick = ()=>{
@@ -730,7 +736,7 @@ function exCard(ex, i){
       <div class="x">×</div>
       <input inputmode="numeric" placeholder="${esc(gr)}" value="${esc(s.r)}" data-ex="${i}" data-set="${j}" data-f="r">
       <button class="setdone ${s.done?"on":""}" data-ex="${i}" data-set="${j}" aria-label="Set done">✓</button>
-      <button class="setcopy ${j===0?"hidden":""}" data-copy-ex="${i}" data-copy-set="${j}" aria-label="Copy set above" title="Same as set above">↑</button>
+      <button class="setcopy ${j===0?"hidden":""}" data-copy-ex="${i}" data-copy-set="${j}" aria-label="Copy set above" title="Same as set above">↓</button>
     </div>`;
   }).join("");
   let lastLine = "";
@@ -773,8 +779,8 @@ $("#deleteBtn").onclick = async ()=>{
   toast("Session deleted"); goHome();
 };
 
-/* ============ rest timer ============ */
-let tInt=null, tLeft=0;
+/* ============ rest timer (timestamp-based, survives backgrounding) ============ */
+let tInt=null, tEnd=0, tName="", tFired=false;
 function parseRest(str){
   if(!str) return 90;
   const nums = (str.match(/[\d.]+/g)||[]).map(Number);
@@ -783,23 +789,101 @@ function parseRest(str){
   return Math.round(/min/.test(str) ? v*60 : v);
 }
 function startTimer(ex){
-  tLeft = parseRest(ex.rest);
+  const secs = parseRest(ex.rest);
+  tEnd = Date.now() + secs*1000;
+  tName = ex.name; tFired = false;
   $("#t-label").textContent = "Rest — " + ex.name;
   const t = $("#timer"); t.classList.add("show"); t.classList.remove("done");
-  tick(); clearInterval(tInt); tInt = setInterval(tick, 1000);
+  tick(); clearInterval(tInt); tInt = setInterval(tick, 250);
 }
+function remaining(){ return Math.max(0, Math.round((tEnd - Date.now())/1000)); }
 function tick(){
   const t=$("#timer");
-  if(tLeft<=0){ $("#t-time").textContent="GO"; t.classList.add("done");
-    clearInterval(tInt); setTimeout(stopTimer, 4000); return; }
-  const m=Math.floor(tLeft/60), s=tLeft%60;
+  const left = remaining();
+  if(left<=0){
+    $("#t-time").textContent = "GO!";
+    if(!t.classList.contains("done")){ t.classList.add("done"); onRestDone(); }
+    return;
+  }
+  const m=Math.floor(left/60), s=left%60;
   $("#t-time").textContent = m+":"+String(s).padStart(2,"0");
-  tLeft--;
 }
-function stopTimer(){ clearInterval(tInt); $("#timer").classList.remove("show"); }
+function onRestDone(){
+  if(tFired) return; tFired = true;
+  clearInterval(tInt);
+  beep(); vibrate([200,80,200]);
+  // if we're backgrounded, try to notify so returning shows the alert
+  notifyRestOver();
+  setTimeout(stopTimer, 5000);
+}
+function stopTimer(){ clearInterval(tInt); $("#timer").classList.remove("show"); tEnd=0; }
 $("#t-skip").onclick = stopTimer;
-$("#t-add").onclick = ()=>{ tLeft+=30; $("#timer").classList.remove("done"); tick();
-  clearInterval(tInt); tInt=setInterval(tick,1000); };
+$("#t-add").onclick = ()=>{
+  if(!tEnd) return;
+  // if already finished, extend from now; else extend the existing end
+  tEnd = (remaining()>0 ? tEnd : Date.now()) + 30000;
+  tFired = false;
+  $("#timer").classList.remove("done");
+  tick(); clearInterval(tInt); tInt=setInterval(tick,250);
+};
+
+/* recompute the moment we come back to the app (fixes frozen countdown) */
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible" && tEnd){
+    if(remaining()<=0){
+      $("#t-time").textContent="GO!"; $("#timer").classList.add("done");
+      if(!tFired){ tFired=true; beep(); vibrate([200,80,200]); setTimeout(stopTimer,5000); }
+    } else { tick(); }
+  }
+});
+
+/* ---- feedback helpers ---- */
+let audioCtx=null;
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type="sine"; o.frequency.value=880;
+    g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+0.5);
+    o.start(); o.stop(audioCtx.currentTime+0.5);
+    // second chirp
+    const o2=audioCtx.createOscillator(), g2=audioCtx.createGain();
+    o2.connect(g2); g2.connect(audioCtx.destination);
+    o2.type="sine"; o2.frequency.value=1174;
+    g2.gain.setValueAtTime(0.0001, audioCtx.currentTime+0.28);
+    g2.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime+0.30);
+    g2.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+0.8);
+    o2.start(audioCtx.currentTime+0.28); o2.stop(audioCtx.currentTime+0.8);
+  }catch(e){}
+}
+function vibrate(pattern){ try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
+function unlockAudio(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+  }catch(e){}
+}
+let notifyAsked=false;
+function askNotifyOnce(){
+  if(notifyAsked) return; notifyAsked=true;
+  try{
+    if("Notification" in window && Notification.permission==="default"){
+      Notification.requestPermission().catch(()=>{});
+    }
+  }catch(e){}
+}
+function notifyRestOver(){
+  try{
+    if(document.visibilityState!=="visible" && "Notification" in window
+       && Notification.permission==="granted"){
+      new Notification("Rest over 💪", {body:(tName||"Next set")+" — time to lift", tag:"rest-timer"});
+    }
+  }catch(e){}
+}
 
 /* ============ navigation ============ */
 function showView(v){
