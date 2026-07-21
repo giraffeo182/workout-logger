@@ -192,7 +192,9 @@
   .ivlsetup h3{margin:0 0 4px;font-size:15px;}
   .ivlsetup .il-sub{font-size:12px;color:var(--muted);margin:0 0 12px;}
   .progcard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
-    border-radius:16px;padding:16px;cursor:pointer;}
+    border-radius:16px;padding:16px;cursor:pointer;width:100%;text-align:left;
+    font-family:inherit;color:var(--ink);}
+  button.progcard{-webkit-appearance:none;appearance:none;}
   .progcard .pc-t{font-weight:800;font-size:15px;}
   .progcard .pc-s{font-size:12.5px;color:var(--muted);margin-top:2px;}
   .progcard .chev{margin-left:auto;color:var(--muted);font-size:22px;}
@@ -368,6 +370,10 @@
       <label>Custom lead-in (sec)</label>
       <input inputmode="numeric" id="setLeadCustom" placeholder="e.g. 7">
     </div>
+    <button class="progcard" id="openLeadAdv" style="margin-top:10px;width:100%">
+      <div><div class="pc-t">Advanced</div>
+      <div class="pc-s">Per-cardio lead-in for treadmill, rowing, ski erg</div></div>
+      <div class="chev">›</div></button>
     <p class="settings-note">The countdown before an interval timer's first round.</p>
 
     <h2>Changelog</h2>
@@ -375,6 +381,47 @@
       <button class="toggle ${''}" id="setTimes" aria-label="Show release times"></button> Show release times
     </div>
     <p class="settings-note">Adds the time of day next to each version's date in the version history.</p>
+  </div>
+
+  <!-- ADVANCED LEAD-IN -->
+  <div class="view" id="view-leadadv">
+    <p class="settings-note" style="margin-top:0">Set a separate lead-in for each cardio type. “Use default” follows your main Interval lead-in setting. Any cardio that isn't one of these three uses the default too.</p>
+
+    <h2>Treadmill</h2>
+    <div class="optrow" data-adv="treadmill">
+      <button class="opt" data-adv-val="default">Use default</button>
+      <button class="opt" data-adv-val="3">3 sec</button>
+      <button class="opt" data-adv-val="5">5 sec</button>
+      <button class="opt" data-adv-val="10">10 sec</button>
+      <button class="opt opt-wide" data-adv-val="custom">Custom</button>
+    </div>
+    <div class="field adv-custom" data-advcustom="treadmill" style="display:none;margin-top:10px">
+      <label>Custom lead-in (sec)</label><input inputmode="numeric" placeholder="e.g. 7">
+    </div>
+
+    <h2>Rowing machine</h2>
+    <div class="optrow" data-adv="rowing">
+      <button class="opt" data-adv-val="default">Use default</button>
+      <button class="opt" data-adv-val="3">3 sec</button>
+      <button class="opt" data-adv-val="5">5 sec</button>
+      <button class="opt" data-adv-val="10">10 sec</button>
+      <button class="opt opt-wide" data-adv-val="custom">Custom</button>
+    </div>
+    <div class="field adv-custom" data-advcustom="rowing" style="display:none;margin-top:10px">
+      <label>Custom lead-in (sec)</label><input inputmode="numeric" placeholder="e.g. 7">
+    </div>
+
+    <h2>Ski erg</h2>
+    <div class="optrow" data-adv="skierg">
+      <button class="opt" data-adv-val="default">Use default</button>
+      <button class="opt" data-adv-val="3">3 sec</button>
+      <button class="opt" data-adv-val="5">5 sec</button>
+      <button class="opt" data-adv-val="10">10 sec</button>
+      <button class="opt opt-wide" data-adv-val="custom">Custom</button>
+    </div>
+    <div class="field adv-custom" data-advcustom="skierg" style="display:none;margin-top:10px">
+      <label>Custom lead-in (sec)</label><input inputmode="numeric" placeholder="e.g. 7">
+    </div>
   </div>
 
   <!-- PROGRAM & DATA -->
@@ -497,9 +544,11 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.3";
+const APP_VERSION = "1.2.0 beta 1";
 const CHANGELOG = [
-  { ver:"1.1.3", date:"Jul 21, 2026", time:"9:41 AM", tag:"current", notes:[
+  { ver:"1.2.0 beta 1", date:"Jul 21, 2026", time:"9:51 AM", tag:"current", notes:[
+    "Added Advanced interval lead-in — set a separate lead-in countdown for treadmill, rowing, and ski erg. Other cardio uses your default." ]},
+  { ver:"1.1.3", date:"Jul 21, 2026", time:"9:41 AM", notes:[
     "Fixed a bug where changing your phone's light/dark mode would kick you back to the home screen from other pages.",
     "The beta notes dropdown now says “Hide 1.1.0 beta notes” once it's open." ]},
   { ver:"1.1.2", date:"Jul 21, 2026", time:"12:10 AM", notes:[
@@ -634,7 +683,8 @@ const DEFAULT_PROGRAM = { days: [
 /* ============ state ============ */
 let program = null;
 let sessions = [];
-let settings = { bar:45, lead:5, showTimes:false, theme:"device" };
+let settings = { bar:45, lead:5, showTimes:false, theme:"device",
+  leadAdv:{ treadmill:"default", rowing:"default", skierg:"default" } };
 let cur = null;          // current session being edited
 let curDay = null;       // day object
 let editingId = null;    // session id if editing a saved one
@@ -770,7 +820,40 @@ function wireSettings(){
   });
   paintTheme();
 
+  // Advanced lead-in page
+  const openAdv = $("#openLeadAdv");
+  if(openAdv) openAdv.onclick = ()=>{ showView("leadadv"); $("#title").textContent="Advanced lead-in"; $("#subtitle").textContent="Per-cardio countdown"; };
+  wireLeadAdv();
+
   paintBar(); paintLead();
+}
+
+function wireLeadAdv(){
+  if(!settings.leadAdv) settings.leadAdv = { treadmill:"default", rowing:"default", skierg:"default" };
+  ["treadmill","rowing","skierg"].forEach(type=>{
+    const row = document.querySelector(`.optrow[data-adv="${type}"]`);
+    if(!row) return;
+    const customWrap = document.querySelector(`.adv-custom[data-advcustom="${type}"]`);
+    const customInput = customWrap.querySelector("input");
+    const PRESETS = ["default","3","5","10"];
+    let customMode = !PRESETS.includes(String(settings.leadAdv[type]));
+    function paint(){
+      row.querySelectorAll(".opt").forEach(b=>{
+        const v=b.dataset.advVal;
+        b.classList.toggle("on", customMode ? v==="custom" : v===String(settings.leadAdv[type]));
+      });
+      customWrap.style.display = customMode ? "" : "none";
+      if(customMode && customInput.value==="") customInput.value = PRESETS.includes(String(settings.leadAdv[type]))?"":settings.leadAdv[type];
+    }
+    row.querySelectorAll(".opt").forEach(b=>{
+      b.onclick=()=>{
+        if(b.dataset.advVal==="custom"){ customMode=true; paint(); customInput.focus(); }
+        else { customMode=false; settings.leadAdv[type]=b.dataset.advVal; saveSettings(); paint(); }
+      };
+    });
+    customInput.oninput=()=>{ const v=parseInt(customInput.value,10); if(isFinite(v)&&v>=0){ settings.leadAdv[type]=String(v); saveSettings(); } };
+    paint();
+  });
 }
 
 /* plate breakdown: returns per-side plates for a total weight */
@@ -1118,7 +1201,7 @@ function renderLog(){
     const on=parseInt($("#il-on").value,10), off=parseInt($("#il-off").value,10), rounds=parseInt($("#il-rounds").value,10);
     if(!(on>0)||!(off>=0)||!(rounds>0)){ toast("Enter valid work / rest / rounds"); return; }
     unlockAudio(); askNotifyOnce();
-    startInterval(on, off, rounds);
+    startInterval(on, off, rounds, curDay.cardio ? (curDay.cardio.label+" "+(curDay.cardio.detail||"")) : "");
   };
   ["f-date","f-notes"].forEach(id=>{
     $("#"+id).oninput = e=>{ const map={"f-date":"date","f-notes":"notes"};
@@ -1335,8 +1418,22 @@ function parseIntervalHint(detail){
   const rounds = detail.match(/[×x]\s*(\d+)/);
   return { on: on?+on[1]:30, off: off?+off[1]:30, rounds: rounds?+rounds[1]:8 };
 }
-function startInterval(on, off, rounds){
-  const lead = leadIn();
+function cardioType(text){
+  const t = (text||"").toLowerCase();
+  if(/ski\s*erg|skierg/.test(t)) return "skierg";
+  if(/row/.test(t)) return "rowing";
+  if(/treadmill|incline walk|run|jog|walk/.test(t)) return "treadmill";
+  return null;
+}
+function leadInFor(cardioText){
+  const type = cardioType(cardioText);
+  const adv = settings.leadAdv || {};
+  const v = type && adv[type];
+  if(v && v!=="default"){ const n=parseInt(v,10); if(isFinite(n)&&n>=0) return n; }
+  return leadIn();
+}
+function startInterval(on, off, rounds, cardioText){
+  const lead = leadInFor(cardioText);
   ivlState = { on, off, rounds, round:0, paused:false };
   const ov=$("#ivl"); ov.classList.add("show");
   if(lead>0){ setIvlPhase("lead", lead); }
