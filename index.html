@@ -290,11 +290,16 @@
 
   .settings-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:6px;}
   .view{display:none;}
-  .view.active{display:block; animation:viewIn .22s ease both;}
+  .view.active{display:block; animation:viewIn .34s cubic-bezier(.22,.61,.36,1) both;}
   .view.active.no-anim{animation:none;}
   @keyframes viewIn{
-    from{opacity:0; transform:translateY(6px);}
-    to{opacity:1; transform:translateY(0);}
+    from{opacity:0; transform:translateX(24px);}
+    to{opacity:1; transform:translateX(0);}
+  }
+  .view.back.active{animation-name:viewInBack;}
+  @keyframes viewInBack{
+    from{opacity:0; transform:translateX(-24px);}
+    to{opacity:1; transform:translateX(0);}
   }
   @media (prefers-reduced-motion: reduce){
     .view.active{animation:none;}
@@ -561,7 +566,7 @@
 const APP_VERSION = "1.2.0 beta 3";
 const CHANGELOG = [
   { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", tag:"current", notes:[
-    "Added a subtle fade-and-slide transition when moving between pages." ]},
+    "Added a smooth slide-and-fade transition when moving between pages, with pages sliding back the other way when you go back." ]},
   { ver:"1.2.0 beta 2", date:"Jul 21, 2026", time:"9:55 AM", notes:[
     "Added a filter to the changelog to switch between all updates and major updates only.",
     "Fixed a flash of a leftover number when starting an interval timer." ]},
@@ -1538,17 +1543,21 @@ document.addEventListener("visibilitychange", ()=>{
 
 /* ============ navigation ============ */
 let lastView = null;
+const VIEW_DEPTH = { home:0, log:1, chart:1, "log-history":1, settings:1, data:1, leadadv:2 };
 function showView(v){
-  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+  // reset scroll first so it doesn't collide with the slide animation
+  window.scrollTo(0,0);
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active","back"));
   const el = $("#view-"+v);
-  el.classList.add("active");
-  // only animate when moving to a different view (avoids jitter on same-view re-renders)
+  // going "back" (to a shallower page) slides from the left; forward slides from the right
+  const goingBack = lastView!==null && (VIEW_DEPTH[v]??0) < (VIEW_DEPTH[lastView]??0);
+  el.classList.toggle("back", goingBack);
   el.classList.toggle("no-anim", v===lastView);
+  el.classList.add("active");
   lastView = v;
   $("#backBtn").style.display = v==="home" ? "none" : "block";
   if(v!=="log"){ $("#exportBtn").style.display="none"; $("#finishbar").style.display="none"; }
   if(v!=="log") setAccent(v==="chart"?{accent:"#2A4E8F",light:"#E4EAF6"}:null);
-  window.scrollTo(0,0);
 }
 function goHome(){ cur=null; curDay=null; editingId=null; stopTimer(); renderHome(); }
 $("#backBtn").onclick = goHome;
