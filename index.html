@@ -120,6 +120,36 @@
   select{width:100%;font-size:16px;padding:11px;border-radius:12px;border:1px solid var(--line);
     background:var(--card);color:var(--ink);font-family:inherit;font-weight:600;
     -webkit-appearance:none;appearance:none;}
+  .setgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;}
+  .platebtn{grid-column:5 / 7;justify-self:start;font-size:11px;font-weight:700;color:var(--accent);
+    background:var(--accent-l);border:none;border-radius:8px;padding:4px 8px;cursor:pointer;margin-top:-2px;}
+  .platebox{grid-column:1 / 7;background:var(--accent-l);border-radius:10px;padding:8px 11px;
+    font-size:12.5px;font-weight:700;color:var(--ink);margin:0 0 6px;line-height:1.5;}
+  .platebox .muted{color:var(--muted);font-weight:600;}
+  /* interval timer overlay */
+  #ivl{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;
+    flex-direction:column;align-items:center;justify-content:center;padding:24px;
+    padding-top:calc(24px + env(safe-area-inset-top));}
+  #ivl.show{display:flex;}
+  #ivl .phase{font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;
+    color:var(--muted);margin-bottom:8px;}
+  #ivl .big{font-size:96px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;
+    color:var(--ink);margin:0;}
+  #ivl .state{font-size:40px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px;}
+  #ivl.on-hard{background:#FCE9E4;} #ivl.on-hard .state{color:#B3402A;}
+  #ivl.on-easy{background:#E3F0EA;} #ivl.on-easy .state{color:#2A6B4F;}
+  #ivl.on-lead{background:var(--bg);} #ivl.on-lead .state{color:var(--muted);}
+  #ivl.on-done{background:#E4EAF6;} #ivl.on-done .state{color:#2A4E8F;}
+  #ivl .rounds{font-size:16px;font-weight:700;color:var(--muted);margin-top:8px;}
+  #ivl .ivl-btns{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom));left:24px;right:24px;
+    display:flex;gap:10px;}
+  #ivl .ivl-btns button{flex:1;padding:15px;font-size:16px;font-weight:800;border-radius:14px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;}
+  .ivlsetup{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0;}
+  .ivlsetup .il-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+  .ivlsetup .il-row .field input{text-align:center;}
+  .ivlsetup h3{margin:0 0 4px;font-size:15px;}
+  .ivlsetup .il-sub{font-size:12px;color:var(--muted);margin:0 0 12px;}
   .progcard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
     border-radius:16px;padding:16px;cursor:pointer;}
   .progcard .pc-t{font-weight:800;font-size:15px;}
@@ -244,6 +274,39 @@
       (label · exercise · target · load · rest · time columns) and replaces the program.
       Your logged sessions are kept.</p>
 
+    <h2>Settings</h2>
+    <div class="setgrid">
+      <div class="field">
+        <label>Barbell weight</label>
+        <select id="setBar">
+          <option value="45">45 lb</option>
+          <option value="35">35 lb</option>
+          <option value="25">25 lb</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="field" id="barCustomWrap" style="display:none">
+        <label>Custom bar (lb)</label>
+        <input inputmode="decimal" id="setBarCustom" placeholder="e.g. 30">
+      </div>
+      <div class="field">
+        <label>Interval lead-in</label>
+        <select id="setLead">
+          <option value="0">None</option>
+          <option value="3">3 sec</option>
+          <option value="5">5 sec</option>
+          <option value="10">10 sec</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="field" id="leadCustomWrap" style="display:none">
+        <label>Custom lead-in (sec)</label>
+        <input inputmode="numeric" id="setLeadCustom" placeholder="e.g. 7">
+      </div>
+    </div>
+    <p class="settings-note">Barbell weight is used for the plate calculator on each weight entry.
+      Lead-in is the countdown before an interval timer's first round.</p>
+
     <h2>Backup</h2>
     <div class="btnrow">
       <button class="btn" id="backupBtn">Export backup</button>
@@ -302,6 +365,17 @@
   <button id="t-skip">Skip</button>
 </div>
 
+<div id="ivl">
+  <div class="phase" id="ivl-phase">Get ready</div>
+  <div class="state" id="ivl-state">READY</div>
+  <p class="big" id="ivl-big">5</p>
+  <div class="rounds" id="ivl-rounds"></div>
+  <div class="ivl-btns">
+    <button id="ivl-pause">Pause</button>
+    <button id="ivl-quit">End</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <div class="modal-bg" id="modalBg">
@@ -318,9 +392,13 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.1.0 beta 4";
+const APP_VERSION = "1.1.0 beta 5";
 const CHANGELOG = [
-  { ver:"1.1.0 beta 4", date:"Jul 22, 2026", tag:"current", notes:[
+  { ver:"1.1.0 beta 5", date:"Jul 22, 2026", tag:"current", notes:[
+    "Added a plate calculator — barbell lifts now show the per-side plate breakdown under each set as you type the weight.",
+    "Added a cardio interval timer with a full-screen WORK / REST display, round counter, and beep + vibration at every switch.",
+    "Added a Settings section: barbell weight (45 / 35 / 25 / custom) and interval lead-in countdown (default 5 sec)." ]},
+  { ver:"1.1.0 beta 4", date:"Jul 22, 2026", notes:[
     "Rest timer now survives leaving the app — reopen it and it shows the correct time left (or GO!) instead of a frozen number.",
     "Added a sound + vibration when rest ends while the app is open.",
     "Changed the copy-set arrow to point down.",
@@ -419,6 +497,7 @@ const DEFAULT_PROGRAM = { days: [
 /* ============ state ============ */
 let program = null;
 let sessions = [];
+let settings = { bar:25, lead:5 };
 let cur = null;          // current session being edited
 let curDay = null;       // day object
 let editingId = null;    // session id if editing a saved one
@@ -449,9 +528,57 @@ async function checkPersistence(){
 (async function init(){
   program = await store.get("program");   // starts empty until imported or sample loaded
   sessions = (await store.get("sessions")) || [];
+  const savedSettings = await store.get("settings");
+  if(savedSettings) settings = Object.assign(settings, savedSettings);
   if(!(await checkPersistence())) $("#storageBanner").style.display = "block";
+  wireSettings();
   renderHome();
 })();
+
+/* ============ SETTINGS ============ */
+function barWeight(){ return isFinite(settings.bar) ? settings.bar : 25; }
+function leadIn(){ return isFinite(settings.lead) ? settings.lead : 5; }
+async function saveSettings(){ await store.set("settings", settings); }
+function wireSettings(){
+  const barSel=$("#setBar"), barCustom=$("#setBarCustom"), barWrap=$("#barCustomWrap");
+  const leadSel=$("#setLead"), leadCustom=$("#setLeadCustom"), leadWrap=$("#leadCustomWrap");
+  // init bar
+  if([45,35,25].includes(settings.bar)){ barSel.value=String(settings.bar); barWrap.style.display="none"; }
+  else { barSel.value="custom"; barWrap.style.display=""; barCustom.value=settings.bar; }
+  // init lead
+  if([0,3,5,10].includes(settings.lead)){ leadSel.value=String(settings.lead); leadWrap.style.display="none"; }
+  else { leadSel.value="custom"; leadWrap.style.display=""; leadCustom.value=settings.lead; }
+
+  barSel.onchange=()=>{ if(barSel.value==="custom"){ barWrap.style.display=""; barCustom.focus(); }
+    else { barWrap.style.display="none"; settings.bar=+barSel.value; saveSettings(); } };
+  barCustom.oninput=()=>{ const v=parseFloat(barCustom.value); if(isFinite(v)&&v>0){ settings.bar=v; saveSettings(); } };
+  leadSel.onchange=()=>{ if(leadSel.value==="custom"){ leadWrap.style.display=""; leadCustom.focus(); }
+    else { leadWrap.style.display="none"; settings.lead=+leadSel.value; saveSettings(); } };
+  leadCustom.oninput=()=>{ const v=parseInt(leadCustom.value,10); if(isFinite(v)&&v>=0){ settings.lead=v; saveSettings(); } };
+}
+
+/* plate breakdown: returns array of per-side plates or null */
+const PLATES = [45,35,25,10,5,2.5];
+function platesFor(total){
+  const bar = barWeight();
+  const t = parseFloat(total);
+  if(!isFinite(t)) return {err:"—"};
+  if(t < bar) return {err:`under bar (${bar})`};
+  let perSide = (t - bar)/2;
+  if(perSide===0) return {bar, list:[], perSide:0};
+  const list=[]; let rem=perSide;
+  for(const p of PLATES){ while(rem >= p - 1e-9){ list.push(p); rem -= p; } }
+  const leftover = Math.round(rem*100)/100;
+  return {bar, list, perSide, leftover};
+}
+function platesText(total){
+  const r = platesFor(total);
+  if(r.err) return `<span class="muted">Plates: ${esc(r.err)}</span>`;
+  if(r.perSide===0) return `<span class="muted">Just the ${r.bar} lb bar</span>`;
+  let s = `Per side: <b>${r.list.join(" + ")}</b> <span class="muted">(${r.perSide} lb/side, ${r.bar} bar)</span>`;
+  if(r.leftover>0) s += ` <span class="muted">+ ${r.leftover} extra</span>`;
+  return s;
+}
 
 /* ============ HOME ============ */
 function renderHome(){
@@ -656,17 +783,32 @@ function renderLog(){
   }
   // cardio
   const c = curDay.cardio;
-  if(c) html += `<div class="cardio"><div class="c-head">
+  if(c){
+    const pre = parseIntervalHint(c.detail||"");
+    html += `<div class="cardio"><div class="c-head">
       <div class="c-name">${esc(c.label)}</div>
       <span class="spec"><b>${esc(c.mins||"")}</b></span></div>
-    <div class="c-detail">${esc(c.detail||"")}</div>
-    <div class="togglewrap"><button class="toggle ${cur.cardioDone?"on":""}" id="cardioT" aria-label="Cardio done"></button> Cardio done</div></div>`;
+      <div class="c-detail">${esc(c.detail||"")}</div>
+      <div class="togglewrap"><button class="toggle ${cur.cardioDone?"on":""}" id="cardioT" aria-label="Cardio done"></button> Cardio done</div>
+      <div class="ivlsetup">
+        <h3>Interval timer</h3>
+        <p class="il-sub">Set your work / rest / rounds, then start.</p>
+        <div class="il-row">
+          <div class="field"><label>Work (sec)</label><input inputmode="numeric" id="il-on" value="${pre.on}"></div>
+          <div class="field"><label>Rest (sec)</label><input inputmode="numeric" id="il-off" value="${pre.off}"></div>
+          <div class="field"><label>Rounds</label><input inputmode="numeric" id="il-rounds" value="${pre.rounds}"></div>
+        </div>
+        <button class="btn primary" id="il-start" style="width:100%">Start interval</button>
+      </div></div>`;
+  }
   $("#exList").innerHTML = html;
 
   // wire inputs
   $("#exList").querySelectorAll("input[data-ex]").forEach(inp=>{
     inp.oninput = ()=>{ const {ex,set,f}=inp.dataset;
-      cur.sets[ex][set][f]=inp.value; queueDraft(); };
+      cur.sets[ex][set][f]=inp.value;
+      if(f==="w") refreshPlate(ex, set);
+      queueDraft(); };
   });
   $("#exList").querySelectorAll(".setdone").forEach(btn=>{
     btn.onclick = ()=>{ const {ex,set}=btn.dataset; const s=cur.sets[ex][set];
@@ -686,16 +828,44 @@ function renderLog(){
       const rIn = row.querySelector('input[data-f="r"]');
       if(wIn) wIn.value = prev.w;
       if(rIn) rIn.value = prev.r;
+      refreshPlate(ex, set);
       queueDraft();
     };
   });
   const ct = $("#cardioT");
   if(ct) ct.onclick = ()=>{ cur.cardioDone=!cur.cardioDone; ct.classList.toggle("on",cur.cardioDone); queueDraft(); };
+  const ils = $("#il-start");
+  if(ils) ils.onclick = ()=>{
+    const on=parseInt($("#il-on").value,10), off=parseInt($("#il-off").value,10), rounds=parseInt($("#il-rounds").value,10);
+    if(!(on>0)||!(off>=0)||!(rounds>0)){ toast("Enter valid work / rest / rounds"); return; }
+    unlockAudio(); askNotifyOnce();
+    startInterval(on, off, rounds);
+  };
   ["f-date","f-notes"].forEach(id=>{
     $("#"+id).oninput = e=>{ const map={"f-date":"date","f-notes":"notes"};
       cur[map[id]] = e.target.value; queueDraft(); };
   });
   window.scrollTo(0,0);
+}
+
+/* live-refresh a set's plate breakdown; create/remove the box as weight changes */
+function refreshPlate(ex, set){
+  if(!isBarbell(curDay.exercises[ex])) return;
+  const w = cur.sets[ex][set].w;
+  const inp = $(`#exList input[data-ex="${ex}"][data-set="${set}"][data-f="w"]`);
+  if(!inp) return;
+  const row = inp.closest(".setrow");
+  let box = row.nextElementSibling;
+  const isBox = box && box.classList && box.classList.contains("platebox");
+  if(w){
+    if(isBox){ box.innerHTML = platesText(w); }
+    else {
+      const div = document.createElement("div");
+      div.className = "platebox";
+      div.innerHTML = platesText(w);
+      row.parentNode.insertBefore(div, row.nextSibling);
+    }
+  } else if(isBox){ box.remove(); }
 }
 
 function sessionVolume(s){
@@ -722,13 +892,20 @@ function pastSetsFor(pastSession, ex){
   return logged.length ? {sets:arr, date:pastSession.date} : null;
 }
 
+function isBarbell(ex){
+  return /barbell|bench press|back squat|\brdl\b|romanian|deadlift|\bogh? p\b|overhead press|\bbar\b/i.test(ex.name)
+    && !/dumbbell|db |machine|cable/i.test(ex.name);
+}
 function exCard(ex, i){
   const sets = cur.sets[i] || [];
   const past = pastSetsFor(lastSessionFor(cur.dayId), ex);
+  const bb = isBarbell(ex);
   const rows = sets.map((s,j)=>{
     const p = past && past.sets[j];
     const gw = p && p.w ? p.w : "wt";
     const gr = p && p.r ? p.r : "reps";
+    const plateLine = (bb && s.w) ?
+      `<div class="platebox" data-plate-ex="${i}" data-plate-set="${j}">${platesText(s.w)}</div>` : "";
     return `
     <div class="setrow">
       <div class="sn">${j+1}</div>
@@ -737,7 +914,7 @@ function exCard(ex, i){
       <input inputmode="numeric" placeholder="${esc(gr)}" value="${esc(s.r)}" data-ex="${i}" data-set="${j}" data-f="r">
       <button class="setdone ${s.done?"on":""}" data-ex="${i}" data-set="${j}" aria-label="Set done">✓</button>
       <button class="setcopy ${j===0?"hidden":""}" data-copy-ex="${i}" data-copy-set="${j}" aria-label="Copy set above" title="Same as set above">↓</button>
-    </div>`;
+    </div>${plateLine}`;
   }).join("");
   let lastLine = "";
   if(past){
@@ -884,6 +1061,86 @@ function notifyRestOver(){
     }
   }catch(e){}
 }
+
+/* ============ interval timer ============ */
+let ivlState=null;   // {on,off,rounds,phase,round,phaseEnd,paused,pauseLeft}
+let ivlInt=null;
+function parseIntervalHint(detail){
+  // try to find "30s hard / 90s easy × 8" style; fall back to sensible defaults
+  const on = detail.match(/(\d+)\s*s(?:ec)?\s*(?:hard|on|work)/i);
+  const off = detail.match(/(\d+)\s*s(?:ec)?\s*(?:easy|off|rest)/i);
+  const rounds = detail.match(/[×x]\s*(\d+)/);
+  return { on: on?+on[1]:30, off: off?+off[1]:30, rounds: rounds?+rounds[1]:8 };
+}
+function startInterval(on, off, rounds){
+  const lead = leadIn();
+  ivlState = { on, off, rounds, round:0, paused:false };
+  const ov=$("#ivl"); ov.classList.add("show");
+  if(lead>0){ setIvlPhase("lead", lead); }
+  else { ivlState.round=1; setIvlPhase("hard", on); }
+  clearInterval(ivlInt); ivlInt=setInterval(ivlTick, 200);
+}
+function setIvlPhase(phase, secs){
+  ivlState.phase = phase;
+  ivlState.phaseEnd = Date.now() + secs*1000;
+  const ov=$("#ivl");
+  ov.classList.remove("on-lead","on-hard","on-easy","on-done");
+  ov.classList.add("on-"+phase);
+  const labels = {lead:"Get ready", hard:"WORK", easy:"REST", done:"Done"};
+  const states = {lead:"READY", hard:"HARD", easy:"EASY", done:"✓"};
+  $("#ivl-phase").textContent = labels[phase];
+  $("#ivl-state").textContent = states[phase];
+  if(phase==="done"){
+    $("#ivl-big").textContent=""; $("#ivl-rounds").textContent = `${ivlState.rounds} rounds complete`;
+  } else {
+    $("#ivl-rounds").textContent = phase==="lead" ? "" : `Round ${ivlState.round} of ${ivlState.rounds}`;
+  }
+  beep(); vibrate(phase==="hard"?[300]:[120]);
+}
+function ivlRemaining(){ return Math.max(0, Math.round((ivlState.phaseEnd - Date.now())/1000)); }
+function ivlTick(){
+  if(!ivlState || ivlState.paused) return;
+  const left = ivlRemaining();
+  if(ivlState.phase!=="done") $("#ivl-big").textContent = left;
+  if(left>0) return;
+  // advance phase
+  const st = ivlState;
+  if(st.phase==="lead"){ st.round=1; setIvlPhase("hard", st.on); }
+  else if(st.phase==="hard"){
+    if(st.off>0){ setIvlPhase("easy", st.off); }
+    else { nextRoundOrDone(); }
+  }
+  else if(st.phase==="easy"){ nextRoundOrDone(); }
+}
+function nextRoundOrDone(){
+  const st=ivlState;
+  if(st.round >= st.rounds){ finishInterval(); }
+  else { st.round++; setIvlPhase("hard", st.on); }
+}
+function finishInterval(){
+  setIvlPhase("done", 0);
+  beep(); vibrate([200,80,200,80,200]);
+  clearInterval(ivlInt);
+  if(document.visibilityState!=="visible" && "Notification" in window && Notification.permission==="granted"){
+    try{ new Notification("Intervals done 🎉", {body:"Nice work — cardio complete", tag:"interval"}); }catch(e){}
+  }
+}
+function stopInterval(){ clearInterval(ivlInt); ivlState=null; $("#ivl").classList.remove("show"); }
+$("#ivl-quit").onclick = stopInterval;
+$("#ivl-pause").onclick = ()=>{
+  if(!ivlState) return;
+  if(ivlState.paused){
+    // resume: shift phaseEnd forward by paused duration
+    ivlState.phaseEnd = Date.now() + ivlState.pauseLeft*1000;
+    ivlState.paused=false; $("#ivl-pause").textContent="Pause";
+  } else {
+    ivlState.pauseLeft = ivlRemaining();
+    ivlState.paused=true; $("#ivl-pause").textContent="Resume";
+  }
+};
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible" && ivlState && !ivlState.paused){ ivlTick(); }
+});
 
 /* ============ navigation ============ */
 function showView(v){
