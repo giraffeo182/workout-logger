@@ -155,6 +155,14 @@
   .plate-ico{background:var(--accent-l);border:none;border-radius:9px;color:var(--accent);
     width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;
     flex:none;padding:0;}
+  .musclechip{border:1px solid var(--line);background:var(--accent-l);color:var(--accent);
+    font-weight:700;cursor:pointer;font-family:inherit;}
+  .muscle-wrap{display:flex;justify-content:center;padding:6px 0 10px;}
+  #bodymap{width:150px;height:auto;}
+  .muscle-legend{font-size:13px;line-height:1.7;}
+  .ml-row{display:flex;align-items:center;gap:8px;}
+  .ml-dot{width:12px;height:12px;border-radius:99px;flex:none;background:var(--accent);}
+  .ml-dot.sec{opacity:0.4;}
   .pc-tabs{display:flex;gap:8px;margin-bottom:14px;}
   .pc-tab{flex:1;font-size:13px;font-weight:700;padding:10px;border-radius:10px;border:1px solid var(--line);
     background:var(--card);color:var(--muted);cursor:pointer;}
@@ -563,11 +571,27 @@
   </div>
 </div>
 
+<div class="modal-bg" id="muscleBg">
+  <div class="modal">
+    <h3 id="muscle-title">Muscles worked</h3>
+    <div class="muscle-wrap">
+      <svg id="bodymap" viewBox="0 0 200 380" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="muscle-legend" id="muscle-legend"></div>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn" id="muscle-close">Done</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.2.0 beta 3";
+const APP_VERSION = "1.2.0 beta 4";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", tag:"current", notes:[
+  { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", tag:"current", notes:[
+    "Each exercise now shows which muscles it works — tap the muscle chip to see a body-map highlight of the primary and secondary muscles.",
+    "Returning to the home screen now keeps your scroll position instead of jumping to the top." ]},
+  { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", notes:[
     "Added a smooth slide-and-fade transition when moving between pages, with pages sliding back the other way when you go back." ]},
   { ver:"1.2.0 beta 2", date:"Jul 21, 2026", time:"9:55 AM", notes:[
     "Added a filter to the changelog to switch between all updates and major updates only.",
@@ -897,6 +921,57 @@ function platesFor(total){
   return {bar, list, perSide, leftover};
 }
 
+/* ============ muscle body map ============ */
+/* stylized front-view body; each region id maps to one or more SVG shapes */
+const BODY_SHAPES = {
+  frontdelts:'<ellipse cx="66" cy="96" rx="12" ry="10"/><ellipse cx="134" cy="96" rx="12" ry="10"/>',
+  sidedelts:'<ellipse cx="56" cy="98" rx="8" ry="11"/><ellipse cx="144" cy="98" rx="8" ry="11"/>',
+  chest:'<path d="M78 92 h44 a6 6 0 0 1 6 6 v18 a10 10 0 0 1 -10 10 h-42 a10 10 0 0 1 -10 -10 v-18 a6 6 0 0 1 6 -6 z"/>',
+  abs:'<rect x="86" y="132" width="28" height="46" rx="6"/>',
+  biceps:'<ellipse cx="54" cy="128" rx="8" ry="16"/><ellipse cx="146" cy="128" rx="8" ry="16"/>',
+  triceps:'<ellipse cx="48" cy="130" rx="7" ry="15"/><ellipse cx="152" cy="130" rx="7" ry="15"/>',
+  forearms:'<ellipse cx="46" cy="162" rx="7" ry="17"/><ellipse cx="154" cy="162" rx="7" ry="17"/>',
+  traps:'<path d="M84 78 q16 -10 32 0 l-6 8 h-20 z"/>',
+  quads:'<ellipse cx="86" cy="230" rx="13" ry="34"/><ellipse cx="114" cy="230" rx="13" ry="34"/>',
+  hamstrings:'<ellipse cx="86" cy="238" rx="12" ry="30"/><ellipse cx="114" cy="238" rx="12" ry="30"/>',
+  glutes:'<ellipse cx="86" cy="196" rx="14" ry="12"/><ellipse cx="114" cy="196" rx="14" ry="12"/>',
+  calves:'<ellipse cx="87" cy="300" rx="9" ry="24"/><ellipse cx="113" cy="300" rx="9" ry="24"/>',
+  lats:'<path d="M72 118 l-6 30 8 6 6 -34 z"/><path d="M128 118 l6 30 -8 6 -6 -34 z"/>',
+  upperback:'<rect x="82" y="104" width="36" height="26" rx="6"/>',
+  lowerback:'<rect x="84" y="150" width="32" height="22" rx="5"/>',
+  reardelts:'<ellipse cx="64" cy="100" rx="9" ry="9"/><ellipse cx="136" cy="100" rx="9" ry="9"/>'
+};
+function openMuscleMap(ex){
+  const m = musclesFor(ex); if(!m) return;
+  $("#muscle-title").textContent = ex.name;
+  const prim = new Set(m.primary), sec = new Set(m.secondary||[]);
+  // base body silhouette
+  const body = `
+    <g fill="var(--line)" opacity="0.55">
+      <circle cx="100" cy="46" r="20"/>
+      <rect x="72" y="70" width="56" height="74" rx="16"/>
+      <rect x="80" y="140" width="40" height="60" rx="12"/>
+      <rect x="42" y="92" width="16" height="92" rx="8"/>
+      <rect x="142" y="92" width="16" height="92" rx="8"/>
+      <rect x="78" y="196" width="18" height="130" rx="9"/>
+      <rect x="104" y="196" width="18" height="130" rx="9"/>
+    </g>`;
+  // highlighted regions
+  let hl = "";
+  Object.keys(BODY_SHAPES).forEach(id=>{
+    if(prim.has(id)) hl += `<g fill="var(--accent)" opacity="0.95">${BODY_SHAPES[id]}</g>`;
+    else if(sec.has(id)) hl += `<g fill="var(--accent)" opacity="0.4">${BODY_SHAPES[id]}</g>`;
+  });
+  $("#bodymap").innerHTML = body + hl;
+  // legend
+  const line = (ids, label, cls) => ids.length
+    ? `<div class="ml-row"><span class="ml-dot ${cls}"></span>${label}: ${ids.map(id=>MUSCLE_LABELS[id]||id).join(", ")}</div>` : "";
+  $("#muscle-legend").innerHTML = line(m.primary,"Primary","prim") + line(m.secondary||[],"Secondary","sec");
+  $("#muscleBg").classList.add("show");
+}
+$("#muscle-close") && ($("#muscle-close").onclick = ()=> $("#muscleBg").classList.remove("show"));
+$("#muscleBg") && ($("#muscleBg").addEventListener("click", e=>{ if(e.target===$("#muscleBg")) $("#muscleBg").classList.remove("show"); }));
+
 /* ============ plate calculator modal ============ */
 let pcPlates = [];  // plates on one side in plates→weight mode
 function openPlateCalc(){
@@ -1214,6 +1289,9 @@ function renderLog(){
   $("#exList").querySelectorAll('[data-plate-open]').forEach(btn=>{
     btn.onclick = ()=> openPlateCalc();
   });
+  $("#exList").querySelectorAll('[data-muscle-ex]').forEach(btn=>{
+    btn.onclick = ()=> openMuscleMap(curDay.exercises[+btn.dataset.muscleEx]);
+  });
   $("#exList").querySelectorAll(".setdone").forEach(btn=>{
     btn.onclick = ()=>{ const {ex,set}=btn.dataset; const s=cur.sets[ex][set];
       s.done=!s.done; btn.classList.toggle("on",s.done);
@@ -1278,6 +1356,42 @@ function isBarbell(ex){
   return /barbell|bench press|back squat|\brdl\b|romanian|deadlift|\bogh? p\b|overhead press|\bbar\b/i.test(ex.name)
     && !/dumbbell|db |machine|cable/i.test(ex.name);
 }
+
+/* muscle lookup: keyword in exercise name -> {primary:[], secondary:[]} using body-map region ids */
+const MUSCLE_RULES = [
+  [/bench press|chest press|chest fly|cable fly|pec|push[- ]?up/i, {primary:["chest"], secondary:["triceps","frontdelts"]}],
+  [/incline (db |dumbbell )?press|incline press/i,               {primary:["chest","frontdelts"], secondary:["triceps"]}],
+  [/overhead press|shoulder press|ohp|military/i,                {primary:["frontdelts"], secondary:["triceps","traps"]}],
+  [/lateral raise|side raise/i,                                  {primary:["sidedelts"], secondary:[]}],
+  [/tricep|pushdown|skull ?crusher|overhead.*extension|overhead cable|rope pushdown/i,{primary:["triceps"], secondary:[]}],
+  [/back squat|front squat|\bsquat|leg press|lunge|split squat|bulgarian/i, {primary:["quads","glutes"], secondary:["hamstrings","calves"]}],
+  [/leg extension/i,                                             {primary:["quads"], secondary:[]}],
+  [/rdl|romanian|deadlift|good ?morning|pull[- ]?through/i,       {primary:["hamstrings","glutes"], secondary:["lowerback","traps"]}],
+  [/leg curl|hamstring curl/i,                                   {primary:["hamstrings"], secondary:["calves"]}],
+  [/hip thrust|glute bridge/i,                                   {primary:["glutes"], secondary:["hamstrings"]}],
+  [/calf raise|calf/i,                                           {primary:["calves"], secondary:[]}],
+  [/lat pulldown|pull[- ]?up|chin[- ]?up|pulldown/i,             {primary:["lats"], secondary:["biceps","upperback"]}],
+  [/row|low row/i,                                               {primary:["upperback","lats"], secondary:["biceps","reardelts"]}],
+  [/curl|bicep/i,                                                {primary:["biceps"], secondary:["forearms"]}],
+  [/shrug|trap/i,                                                {primary:["traps"], secondary:[]}],
+  [/crunch|sit[- ]?up|plank|knee raise|leg raise|ab |abs|core/i, {primary:["abs"], secondary:[]}],
+  [/face pull|rear delt/i,                                       {primary:["reardelts"], secondary:["upperback"]}]
+];
+const MUSCLE_LABELS = {
+  chest:"Chest", frontdelts:"Front delts", sidedelts:"Side delts", reardelts:"Rear delts",
+  triceps:"Triceps", biceps:"Biceps", forearms:"Forearms", lats:"Lats", upperback:"Upper back",
+  lowerback:"Lower back", traps:"Traps", abs:"Abs / core", quads:"Quads", hamstrings:"Hamstrings",
+  glutes:"Glutes", calves:"Calves"
+};
+function musclesFor(ex){
+  const name = ex.name || "";
+  for(const [re,m] of MUSCLE_RULES){ if(re.test(name)) return m; }
+  return null;
+}
+function muscleChipText(m){
+  return m.primary.map(id=>MUSCLE_LABELS[id]||id).join(", ");
+}
+
 function exCard(ex, i){
   const sets = cur.sets[i] || [];
   const past = pastSetsFor(lastSessionFor(cur.dayId), ex);
@@ -1315,7 +1429,8 @@ function exCard(ex, i){
     <div class="ex-specs">
       <span class="spec">Target <b>${esc(ex.target)}</b></span>
       <span class="spec">Load <b>${esc(ex.load)}</b></span>
-      <span class="spec">Rest <b>${esc(ex.rest)}</b></span></div>
+      <span class="spec">Rest <b>${esc(ex.rest)}</b></span>
+      ${(() => { const m = musclesFor(ex); return m ? `<button class="spec musclechip" data-muscle-ex="${i}">💪 ${esc(muscleChipText(m))}</button>` : ""; })()}</div>
     ${lastLine}
     ${rows}</div>`;
 }
@@ -1545,9 +1660,11 @@ document.addEventListener("visibilitychange", ()=>{
 
 /* ============ navigation ============ */
 let lastView = null;
+let homeScroll = 0;   // remembered scroll position of the home screen
 const VIEW_DEPTH = { home:0, log:1, chart:1, "log-history":1, settings:1, data:1, leadadv:2 };
 function showView(v){
-  window.scrollTo(0,0);
+  // remember where we were on home before leaving it
+  if(lastView==="home" && v!=="home") homeScroll = window.scrollY;
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active","anim-in","anim-back"));
   const el = $("#view-"+v);
   el.classList.add("active");
@@ -1558,6 +1675,13 @@ function showView(v){
     el.classList.add(cls);
     const clear = ()=>{ el.classList.remove("anim-in","anim-back"); el.removeEventListener("animationend", clear); };
     el.addEventListener("animationend", clear);
+  }
+  // restore home's scroll when returning to it; every other view opens at the top
+  if(v==="home"){
+    const target = sameView ? window.scrollY : homeScroll;
+    requestAnimationFrame(()=> window.scrollTo(0, target));
+  } else {
+    window.scrollTo(0,0);
   }
   lastView = v;
   $("#backBtn").style.display = v==="home" ? "none" : "block";
