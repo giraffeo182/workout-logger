@@ -176,8 +176,10 @@
   .pc-hint{font-size:13px;color:var(--muted);margin:0 0 10px;}
   .pc-plates{display:flex;flex-wrap:wrap;gap:8px;}
   .pc-plate{font-size:15px;font-weight:800;padding:12px 0;border-radius:11px;border:1px solid var(--line);
-    background:var(--card);color:var(--ink);cursor:pointer;flex:1 0 26%;min-width:60px;}
+    background:var(--card);color:var(--ink);cursor:pointer;flex:1 0 26%;min-width:60px;
+    display:flex;align-items:center;justify-content:center;gap:7px;}
   .pc-plate:active{background:var(--accent-l);}
+  .pc-swatch{width:12px;height:12px;border-radius:99px;border:1px solid rgba(128,128,128,.4);flex:none;}
   .pc-result{background:var(--accent-l);border-radius:12px;padding:13px 14px;margin-top:12px;
     font-size:15px;font-weight:700;color:var(--ink);line-height:1.5;min-height:20px;}
   .pc-result .muted{color:var(--muted);font-weight:600;font-size:13px;}
@@ -596,8 +598,8 @@
 /* ============ version + changelog ============ */
 const APP_VERSION = "1.2.0 beta 6";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 6", date:"Jul 21, 2026", time:"", tag:"current", notes:[
-    "The plate calculator's Plates → weight mode now shows a rotatable 3D barbell that builds up as you add plates." ]},
+  { ver:"1.2.0 beta 6", date:"Jul 21, 2026", time:"10:20 PM", tag:"current", notes:[
+    "The plate calculator's Plates → weight mode now shows a rotatable, color-coded 3D barbell that builds up as you add plates." ]},
   { ver:"1.2.0 beta 5", date:"Jul 21, 2026", time:"10:01 PM", notes:[
     "The muscle map is now a rotatable 3D body — drag to spin it around and see the worked muscles from any angle." ]},
   { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", notes:[
@@ -1059,8 +1061,10 @@ function openPlateCalc(){
   $("#plateBg").classList.add("show");
   $("#pc-barnote").textContent = `Using a ${barWeight()} lb bar (change in Settings).`;
   // build plate buttons
-  $("#pc-plate-btns").innerHTML = PLATES.map(p=>
-    `<button class="pc-plate" data-p="${p}">${p}</button>`).join("");
+  $("#pc-plate-btns").innerHTML = PLATES.map(p=>{
+    const col = "#"+((PLATE_SPEC[p]&&PLATE_SPEC[p][2])||0x888888).toString(16).padStart(6,"0");
+    return `<button class="pc-plate" data-p="${p}"><span class="pc-swatch" style="background:${col}"></span>${p}</button>`;
+  }).join("");
   $("#pc-plate-btns").querySelectorAll(".pc-plate").forEach(b=>{
     b.onclick = ()=>{ pcPlates.push(+b.dataset.p); renderP2W(); };
   });
@@ -1103,7 +1107,15 @@ function renderP2W(){
 
 /* ============ 3D barbell ============ */
 let bbRenderer, bbScene, bbCamera, bbGroup, bbDrag=null, bbRotY=0.5, bbRotX=0.15;
-const PLATE_SPEC = { 45:[0.95,0.14], 35:[0.82,0.13], 25:[0.68,0.12], 10:[0.52,0.09], 5:[0.4,0.07], 2.5:[0.32,0.06] };
+/* [radius, thickness, color] — colors follow standard competition plate coding */
+const PLATE_SPEC = {
+  45:[0.95,0.14,0xD23B3B],   // red
+  35:[0.82,0.13,0xE0B32A],   // yellow
+  25:[0.68,0.12,0x2FA35A],   // green
+  10:[0.52,0.09,0x3B6FD2],   // blue
+  5:[0.4,0.07,0xE8E8E8],     // white
+  2.5:[0.32,0.06,0x333333]   // black
+};
 function initBarbellScene(){
   const el = $("#barbell3d"); if(!el) return;
   el.innerHTML="";
@@ -1138,7 +1150,6 @@ function buildBarbell(){
   if(bbGroup){ bbScene.remove(bbGroup); }
   bbGroup=new THREE.Group();
   const steel=new THREE.MeshLambertMaterial({color:0xcfd3d8});
-  const accent=hexToThree("--accent");
   // bar shaft
   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,4.6,20), steel);
   shaft.rotation.z=Math.PI/2; bbGroup.add(shaft);
@@ -1154,10 +1165,10 @@ function buildBarbell(){
   [-1,1].forEach(side=>{
     let x=1.42;  // start just outside the collar
     sorted.forEach(p=>{
-      const spec=PLATE_SPEC[p]||[0.4,0.07];
-      const [rad,thick]=spec;
+      const spec=PLATE_SPEC[p]||[0.4,0.07,0x888888];
+      const [rad,thick,color]=spec;
       const plate=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,thick,28),
-        new THREE.MeshLambertMaterial({color:accent}));
+        new THREE.MeshLambertMaterial({color:color}));
       plate.rotation.z=Math.PI/2;
       plate.position.x=side*(x+thick/2);
       bbGroup.add(plate);
