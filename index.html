@@ -618,29 +618,16 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.2.0 beta 9";
+const APP_VERSION = "1.2.0";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 9", date:"Jul 21, 2026", time:"", tag:"current", notes:[
-    "Fixed the cardio timer's WORK / REST screens so the text is readable in dark mode.",
-    "Added two progress bars to the cardio timer: one for the current interval and one for the whole workout." ]},
-  { ver:"1.2.0 beta 8", date:"Jul 21, 2026", time:"10:37 PM", notes:[
-    "Made the 3D muscle model smoother and less blocky, fixed the chest proportions, and extended it down through the calves and feet." ]},
-  { ver:"1.2.0 beta 7", date:"Jul 21, 2026", time:"10:29 PM", notes:[
-    "Color-coded the 3D barbell plates (and the plate buttons) using the standard competition plate colors." ]},
-  { ver:"1.2.0 beta 6", date:"Jul 21, 2026", time:"10:20 PM", notes:[
-    "The plate calculator's Plates → weight mode now shows a rotatable 3D barbell that builds up as you add plates." ]},
-  { ver:"1.2.0 beta 5", date:"Jul 21, 2026", time:"10:01 PM", notes:[
-    "The muscle map is now a rotatable 3D body — drag to spin it around and see the worked muscles from any angle." ]},
-  { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", notes:[
-    "Each exercise now shows which muscles it works — tap the muscle chip to see a body-map highlight of the primary and secondary muscles.",
-    "Returning to the home screen now keeps your scroll position instead of jumping to the top." ]},
-  { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", notes:[
-    "Added a smooth slide-and-fade transition when moving between pages, with pages sliding back the other way when you go back." ]},
-  { ver:"1.2.0 beta 2", date:"Jul 21, 2026", time:"9:55 AM", notes:[
-    "Added a filter to the changelog to switch between all updates and major updates only.",
-    "Fixed a flash of a leftover number when starting an interval timer." ]},
-  { ver:"1.2.0 beta 1", date:"Jul 21, 2026", time:"9:51 AM", notes:[
-    "Added Advanced interval lead-in — set a separate lead-in countdown for treadmill, rowing, and ski erg. Other cardio uses your default." ]},
+  { ver:"1.2.0", date:"Jul 21, 2026", time:"10:46 PM", tag:"current", notes:[
+    "3D muscle map — each exercise shows a muscle chip; tap it to see a rotatable 3D body highlighting the primary and secondary muscles worked.",
+    "3D barbell — the plate calculator's Plates → weight mode shows a rotatable, color-coded barbell that loads up as you add plates.",
+    "Advanced interval lead-in — set a separate countdown for treadmill, rowing, and ski erg.",
+    "Cardio timer upgrades — readable WORK / REST screens with progress bars for the current interval and the whole workout.",
+    "Smooth page transitions when moving between screens.",
+    "Changelog filter to switch between all updates and major updates only.",
+    "The home screen now keeps your scroll position when you return to it." ]},
   { ver:"1.1.3", date:"Jul 21, 2026", time:"9:41 AM", notes:[
     "Fixed a bug where changing your phone's light/dark mode would kick you back to the home screen from other pages.",
     "The beta notes dropdown now says “Hide 1.1.0 beta notes” once it's open." ]},
@@ -671,7 +658,7 @@ const CHANGELOG = [
     "Initial launch — log sets, reps, and notes; rest timer; save sessions; export a filled PDF." ]}
 ];
 /* preserved beta history for 1.1.0, shown under a dropdown */
-const BETA_HISTORY = [
+const BETA_HISTORY_110 = [
   { ver:"1.1.0 beta 8", date:"Jul 20, 2026", time:"11:30 PM", notes:[
     "Restored the 10-sec interval lead-in option, with Custom on its own row." ]},
   { ver:"1.1.0 beta 7", date:"Jul 20, 2026", time:"11:18 PM", notes:[
@@ -700,6 +687,29 @@ const BETA_HISTORY = [
     "Added “last time” ghost data.",
     "Added progress charts.",
     "Removed weight (load) tracking." ]}
+];
+const BETA_HISTORY_120 = [
+  { ver:"1.2.0 beta 9", date:"Jul 21, 2026", time:"10:39 PM", notes:[
+    "Fixed the cardio timer's WORK / REST screens so the text is readable in dark mode.",
+    "Added two progress bars to the cardio timer: current interval and whole workout." ]},
+  { ver:"1.2.0 beta 8", date:"Jul 21, 2026", time:"10:37 PM", notes:[
+    "Made the 3D muscle model smoother and less blocky, fixed the chest proportions, and extended it down through the calves and feet." ]},
+  { ver:"1.2.0 beta 7", date:"Jul 21, 2026", time:"10:29 PM", notes:[
+    "Color-coded the 3D barbell plates (and the plate buttons) using the standard competition plate colors." ]},
+  { ver:"1.2.0 beta 6", date:"Jul 21, 2026", time:"10:20 PM", notes:[
+    "The plate calculator's Plates → weight mode now shows a rotatable 3D barbell that builds up as you add plates." ]},
+  { ver:"1.2.0 beta 5", date:"Jul 21, 2026", time:"10:01 PM", notes:[
+    "The muscle map is now a rotatable 3D body — drag to spin it around." ]},
+  { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", notes:[
+    "Each exercise now shows which muscles it works via a muscle chip and body-map highlight.",
+    "Returning to the home screen now keeps your scroll position." ]},
+  { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", notes:[
+    "Added a smooth slide-and-fade transition when moving between pages." ]},
+  { ver:"1.2.0 beta 2", date:"Jul 21, 2026", time:"9:55 AM", notes:[
+    "Added a filter to the changelog to switch between all updates and major updates only.",
+    "Fixed a flash of a leftover number when starting an interval timer." ]},
+  { ver:"1.2.0 beta 1", date:"Jul 21, 2026", time:"9:51 AM", notes:[
+    "Added Advanced interval lead-in — separate countdown for treadmill, rowing, and ski erg." ]}
 ];
 
 /* ============ storage adapter: window.storage -> localStorage -> memory ============ */
@@ -1319,30 +1329,38 @@ function openChangelog(){
       <ul>${c.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>
     </div>`;
   };
-  const betaDetails = `
-    <details class="beta-notes" id="betaDetails">
-      <summary id="betaSummary">View 1.1.0 beta notes</summary>
-      <div class="beta-inner">${BETA_HISTORY.map(entry).join("")}</div>
+  // beta histories keyed by their major release version
+  const BETA_MAP = { "1.1.0": BETA_HISTORY_110, "1.2.0": BETA_HISTORY_120 };
+  const betaDropdown = (ver, idx) => {
+    const betas = BETA_MAP[ver]; if(!betas) return "";
+    return `
+    <details class="beta-notes" id="betaDetails-${idx}">
+      <summary id="betaSummary-${idx}">View ${esc(ver)} beta notes</summary>
+      <div class="beta-inner">${betas.map(entry).join("")}</div>
     </details>`;
+  };
   const filterBar = `
     <div class="clog-filter">
       <button class="clog-seg ${!clogMajorOnly?"on":""}" data-major="0">All updates</button>
       <button class="clog-seg ${clogMajorOnly?"on":""}" data-major="1">Major only</button>
     </div>`;
   const list = CHANGELOG.filter(c=> !clogMajorOnly || isMajorVer(c.ver));
-  const html = list.map(c=>{
+  const html = list.map((c,idx)=>{
     let block = entry(c);
-    // only attach the beta dropdown in All view (betas aren't "major")
-    if(c.ver==="1.1.0" && !clogMajorOnly) block += betaDetails;
+    if(BETA_MAP[c.ver] && !clogMajorOnly) block += betaDropdown(c.ver, idx);
     return block;
   }).join("");
   $("#changelogWrap").innerHTML = filterBar + `<div class="clog">${html}</div>`;
   $("#changelogWrap").querySelectorAll(".clog-seg").forEach(b=>{
     b.onclick = ()=>{ clogMajorOnly = b.dataset.major==="1"; openChangelog(); };
   });
-  const det = $("#betaDetails");
-  if(det) det.addEventListener("toggle", ()=>{
-    $("#betaSummary").textContent = (det.open ? "Hide" : "View") + " 1.1.0 beta notes";
+  // wire each beta dropdown's View/Hide summary toggle
+  $$(".beta-notes").forEach(det=>{
+    const sum = det.querySelector("summary");
+    const ver = sum.textContent.replace(/^(View|Hide) /,"").replace(" beta notes","");
+    det.addEventListener("toggle", ()=>{
+      sum.textContent = (det.open ? "Hide" : "View") + " " + ver + " beta notes";
+    });
   });
 }
 
