@@ -187,22 +187,34 @@
   /* interval timer overlay */
   #ivl{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;
     flex-direction:column;align-items:center;justify-content:center;padding:24px;
-    padding-top:calc(24px + env(safe-area-inset-top));}
+    padding-top:calc(24px + env(safe-area-inset-top));transition:background .2s;}
   #ivl.show{display:flex;}
   #ivl .phase{font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;
-    color:var(--muted);margin-bottom:8px;}
-  #ivl .big{font-size:96px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;
-    color:var(--ink);margin:0;}
+    margin-bottom:8px;opacity:.85;}
+  #ivl .big{font-size:96px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;margin:0;}
   #ivl .state{font-size:40px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px;}
-  #ivl.on-hard{background:#FCE9E4;} #ivl.on-hard .state{color:#B3402A;}
-  #ivl.on-easy{background:#E3F0EA;} #ivl.on-easy .state{color:#2A6B4F;}
-  #ivl.on-lead{background:var(--bg);} #ivl.on-lead .state{color:var(--muted);}
-  #ivl.on-done{background:#E4EAF6;} #ivl.on-done .state{color:#2A4E8F;}
-  #ivl .rounds{font-size:16px;font-weight:700;color:var(--muted);margin-top:8px;}
+  #ivl .rounds{font-size:16px;font-weight:700;margin-top:8px;opacity:.8;}
+  /* work / rest use saturated fills + white text — readable in light AND dark */
+  #ivl.on-hard{background:#C0392B;} 
+  #ivl.on-easy{background:#1E8B54;}
+  #ivl.on-lead{background:var(--accent);}
+  #ivl.on-done{background:#2A5CB8;}
+  #ivl.on-hard, #ivl.on-easy, #ivl.on-lead, #ivl.on-done{color:#fff;}
+  #ivl.on-hard .phase,#ivl.on-easy .phase,#ivl.on-lead .phase,#ivl.on-done .phase,
+  #ivl.on-hard .state,#ivl.on-easy .state,#ivl.on-lead .state,#ivl.on-done .state,
+  #ivl.on-hard .big,#ivl.on-easy .big,#ivl.on-lead .big,#ivl.on-done .big,
+  #ivl.on-hard .rounds,#ivl.on-easy .rounds,#ivl.on-lead .rounds,#ivl.on-done .rounds{color:#fff;}
+  /* progress bars */
+  #ivl .ivl-bars{position:absolute;left:24px;right:24px;bottom:calc(96px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;gap:10px;}
+  #ivl .ivl-bar-label{display:flex;justify-content:space-between;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.06em;color:#fff;opacity:.85;margin-bottom:3px;}
+  #ivl .ivl-track{height:8px;border-radius:99px;background:rgba(255,255,255,.25);overflow:hidden;}
+  #ivl .ivl-fill{height:100%;border-radius:99px;background:#fff;width:0%;transition:width .2s linear;}
   #ivl .ivl-btns{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom));left:24px;right:24px;
     display:flex;gap:10px;}
   #ivl .ivl-btns button{flex:1;padding:15px;font-size:16px;font-weight:800;border-radius:14px;
-    border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;}
+    border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;}
   .ivlsetup{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0;}
   .ivlsetup .il-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
   .ivlsetup .il-row .field input{text-align:center;}
@@ -531,6 +543,16 @@
   <div class="state" id="ivl-state">READY</div>
   <p class="big" id="ivl-big">5</p>
   <div class="rounds" id="ivl-rounds"></div>
+  <div class="ivl-bars">
+    <div>
+      <div class="ivl-bar-label"><span>This interval</span><span id="ivl-int-pct"></span></div>
+      <div class="ivl-track"><div class="ivl-fill" id="ivl-int-fill"></div></div>
+    </div>
+    <div>
+      <div class="ivl-bar-label"><span>Whole workout</span><span id="ivl-all-pct"></span></div>
+      <div class="ivl-track"><div class="ivl-fill" id="ivl-all-fill"></div></div>
+    </div>
+  </div>
   <div class="ivl-btns">
     <button id="ivl-pause">Pause</button>
     <button id="ivl-quit">End</button>
@@ -596,10 +618,13 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.2.0 beta 8";
+const APP_VERSION = "1.2.0 beta 9";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 8", date:"Jul 21, 2026", time:"10:37 PM", tag:"current", notes:[
-    "Made the 3D muscle model smoother and less blocky, and extended it down through the calves and feet." ]},
+  { ver:"1.2.0 beta 9", date:"Jul 21, 2026", time:"", tag:"current", notes:[
+    "Fixed the cardio timer's WORK / REST screens so the text is readable in dark mode.",
+    "Added two progress bars to the cardio timer: one for the current interval and one for the whole workout." ]},
+  { ver:"1.2.0 beta 8", date:"Jul 21, 2026", time:"10:37 PM", notes:[
+    "Made the 3D muscle model smoother and less blocky, fixed the chest proportions, and extended it down through the calves and feet." ]},
   { ver:"1.2.0 beta 7", date:"Jul 21, 2026", time:"10:29 PM", notes:[
     "Color-coded the 3D barbell plates (and the plate buttons) using the standard competition plate colors." ]},
   { ver:"1.2.0 beta 6", date:"Jul 21, 2026", time:"10:20 PM", notes:[
@@ -946,12 +971,12 @@ const BODY_PARTS = [
   ["base","sphere",0.40,[0,3.02,0]],                 // head
   ["base","cyl",[0.15,0.17,0.42],[0,2.60,0]],        // neck
   ["traps","capsule",[0.20,0.7],[0,2.48,0],0,"z"],   // traps across shoulders
-  ["base","cyl",[0.62,0.52,1.15],[0,1.95,0]],        // torso core (rounded)
-  ["chest","capsule",[0.30,0.5],[0.24,2.18,0.30],1,"z"], // pecs (front)
-  ["upperback","cyl",[0.5,0.5,0.5],[0,2.15,-0.22]],  // upper back
-  ["abs","capsule",[0.24,0.66],[0,1.60,0.34]],       // abs column (front)
-  ["lowerback","cyl",[0.4,0.42,0.5],[0,1.55,-0.30]], // lower back
-  ["lats","capsule",[0.16,0.62],[0.5,1.9,-0.06],1],  // lats (side of back)
+  ["base","cyl",[0.55,0.48,1.15],[0,1.95,0]],        // torso core (rounded, slimmer)
+  ["chest","capsule",[0.20,0.34],[0.19,2.22,0.16],1,"z"], // pecs (smaller, closer to body)
+  ["upperback","cyl",[0.46,0.46,0.5],[0,2.15,-0.14]],// upper back
+  ["abs","capsule",[0.20,0.6],[0,1.62,0.26],0],      // abs column (front, pulled in)
+  ["lowerback","cyl",[0.38,0.4,0.5],[0,1.55,-0.22]], // lower back
+  ["lats","capsule",[0.15,0.58],[0.44,1.9,-0.02],1], // lats (side of back)
   ["frontdelts","sphere",0.28,[0.62,2.34,0.12],1],   // front delts
   ["reardelts","sphere",0.24,[0.62,2.34,-0.16],1],   // rear delts
   ["sidedelts","sphere",0.26,[0.78,2.30,0],1],       // side delts
@@ -1784,7 +1809,7 @@ function leadInFor(cardioText){
 }
 function startInterval(on, off, rounds, cardioText){
   const lead = leadInFor(cardioText);
-  ivlState = { on, off, rounds, round:0, paused:false };
+  ivlState = { on, off, rounds, round:0, paused:false, phaseDur:0 };
   const ov=$("#ivl"); ov.classList.add("show");
   if(lead>0){ setIvlPhase("lead", lead); }
   else { ivlState.round=1; setIvlPhase("hard", on); }
@@ -1792,6 +1817,7 @@ function startInterval(on, off, rounds, cardioText){
 }
 function setIvlPhase(phase, secs){
   ivlState.phase = phase;
+  ivlState.phaseDur = secs;
   ivlState.phaseEnd = Date.now() + secs*1000;
   const ov=$("#ivl");
   ov.classList.remove("on-lead","on-hard","on-easy","on-done");
@@ -1804,15 +1830,43 @@ function setIvlPhase(phase, secs){
     $("#ivl-big").textContent=""; $("#ivl-rounds").textContent = `${ivlState.rounds} rounds complete`;
   } else {
     $("#ivl-rounds").textContent = phase==="lead" ? "" : `Round ${ivlState.round} of ${ivlState.rounds}`;
-    $("#ivl-big").textContent = secs;   // show correct starting number now, not on next tick
+    $("#ivl-big").textContent = secs;
   }
+  updateIvlBars();
   beep(); vibrate(phase==="hard"?[300]:[120]);
 }
 function ivlRemaining(){ return Math.max(0, Math.round((ivlState.phaseEnd - Date.now())/1000)); }
+/* progress bars: current interval fill + overall workout fill */
+function updateIvlBars(){
+  const st=ivlState; if(!st) return;
+  // current interval progress
+  let intPct=0;
+  if(st.phase==="done"){ intPct=100; }
+  else if(st.phaseDur>0){
+    const elapsed = st.phaseDur - Math.max(0,(st.phaseEnd-Date.now())/1000);
+    intPct = Math.max(0, Math.min(100, (elapsed/st.phaseDur)*100));
+  }
+  // overall progress across the working portion (lead-in excluded)
+  const perRound = st.on + st.off;
+  const totalWork = st.rounds * perRound || 1;
+  let doneWork = 0;
+  if(st.phase==="done"){ doneWork = totalWork; }
+  else if(st.phase!=="lead"){
+    doneWork = (st.round-1)*perRound;                    // fully completed rounds
+    if(st.phase==="hard"){ doneWork += (st.on - Math.max(0,(st.phaseEnd-Date.now())/1000)); }
+    else if(st.phase==="easy"){ doneWork += st.on + (st.off - Math.max(0,(st.phaseEnd-Date.now())/1000)); }
+  }
+  const allPct = Math.max(0, Math.min(100, (doneWork/totalWork)*100));
+  $("#ivl-int-fill").style.width = intPct.toFixed(1)+"%";
+  $("#ivl-all-fill").style.width = allPct.toFixed(1)+"%";
+  $("#ivl-all-pct").textContent = Math.round(allPct)+"%";
+  $("#ivl-int-pct").textContent = st.phase==="lead" ? "starting" : Math.round(intPct)+"%";
+}
 function ivlTick(){
   if(!ivlState || ivlState.paused) return;
   const left = ivlRemaining();
   if(ivlState.phase!=="done") $("#ivl-big").textContent = left;
+  updateIvlBars();
   if(left>0) return;
   // advance phase
   const st = ivlState;
