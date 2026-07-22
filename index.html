@@ -162,6 +162,8 @@
   #bodymap3d{width:220px;height:300px;touch-action:none;cursor:grab;}
   #bodymap3d:active{cursor:grabbing;}
   .muscle-hint{text-align:center;font-size:11px;color:var(--muted);margin:0 0 8px;font-weight:600;}
+  #barbell3d{width:100%;height:150px;touch-action:none;margin-bottom:10px;cursor:grab;}
+  #barbell3d:active{cursor:grabbing;}
   #bodymap{width:150px;height:auto;}
   .muscle-legend{font-size:13px;line-height:1.7;}
   .ml-row{display:flex;align-items:center;gap:8px;}
@@ -562,6 +564,7 @@
     </div>
 
     <div id="pc-p2w" style="display:none">
+      <div id="barbell3d"></div>
       <p class="pc-hint">Tap plates to add to <b>one side</b>:</p>
       <div class="pc-plates" id="pc-plate-btns"></div>
       <div class="pc-result" id="pc-p2w-out"></div>
@@ -591,9 +594,11 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.2.0 beta 5";
+const APP_VERSION = "1.2.0 beta 6";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 5", date:"Jul 21, 2026", time:"10:01 PM", tag:"current", notes:[
+  { ver:"1.2.0 beta 6", date:"Jul 21, 2026", time:"", tag:"current", notes:[
+    "The plate calculator's Plates → weight mode now shows a rotatable 3D barbell that builds up as you add plates." ]},
+  { ver:"1.2.0 beta 5", date:"Jul 21, 2026", time:"10:01 PM", notes:[
     "The muscle map is now a rotatable 3D body — drag to spin it around and see the worked muscles from any angle." ]},
   { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", notes:[
     "Each exercise now shows which muscles it works — tap the muscle chip to see a body-map highlight of the primary and secondary muscles.",
@@ -1068,6 +1073,10 @@ function setPcMode(mode){
   $$(".pc-tab").forEach(t=>t.classList.toggle("on", t.dataset.mode===mode));
   $("#pc-w2p").style.display = mode==="w2p" ? "" : "none";
   $("#pc-p2w").style.display = mode==="p2w" ? "" : "none";
+  if(mode==="p2w"){
+    // canvas now has a size — (re)build after layout settles
+    requestAnimationFrame(()=>{ if(bbRenderer) disposeBarbell(); buildBarbell(); });
+  }
 }
 function renderW2P(){
   const r = platesFor($("#pc-total").value);
@@ -1083,17 +1092,93 @@ function renderP2W(){
   const bar = barWeight();
   const perSide = pcPlates.reduce((a,b)=>a+b,0);
   const total = bar + perSide*2;
-  if(!pcPlates.length){ out.innerHTML = `<span class="muted">No plates yet — total is just the ${bar} lb bar.</span>`; return; }
-  const sorted = pcPlates.slice().sort((a,b)=>b-a);
-  out.innerHTML = `<span class="big">${total} lb</span> total<br>
-    <span class="muted">${sorted.join(" + ")} per side (${perSide} lb) × 2 + ${bar} bar</span>`;
+  if(!pcPlates.length){ out.innerHTML = `<span class="muted">No plates yet — total is just the ${bar} lb bar.</span>`; }
+  else {
+    const sorted = pcPlates.slice().sort((a,b)=>b-a);
+    out.innerHTML = `<span class="big">${total} lb</span> total<br>
+      <span class="muted">${sorted.join(" + ")} per side (${perSide} lb) × 2 + ${bar} bar</span>`;
+  }
+  buildBarbell();
+}
+
+/* ============ 3D barbell ============ */
+let bbRenderer, bbScene, bbCamera, bbGroup, bbDrag=null, bbRotY=0.5, bbRotX=0.15;
+const PLATE_SPEC = { 45:[0.95,0.14], 35:[0.82,0.13], 25:[0.68,0.12], 10:[0.52,0.09], 5:[0.4,0.07], 2.5:[0.32,0.06] };
+function initBarbellScene(){
+  const el = $("#barbell3d"); if(!el) return;
+  el.innerHTML="";
+  const w=el.clientWidth||300, h=el.clientHeight||150;
+  bbScene=new THREE.Scene();
+  bbCamera=new THREE.PerspectiveCamera(40, w/h, 0.1, 100);
+  bbCamera.position.set(0,0.6,6); bbCamera.lookAt(0,0,0);
+  bbRenderer=new THREE.WebGLRenderer({antialias:true, alpha:true});
+  bbRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  bbRenderer.setSize(w,h);
+  el.appendChild(bbRenderer.domElement);
+  bbScene.add(new THREE.AmbientLight(0xffffff,0.8));
+  const key=new THREE.DirectionalLight(0xffffff,0.6); key.position.set(3,5,5); bbScene.add(key);
+  // drag
+  const down=e=>{ bbDrag={x:(e.touches?e.touches[0].clientX:e.clientX), y:(e.touches?e.touches[0].clientY:e.clientY), ry:bbRotY, rx:bbRotX}; };
+  const move=e=>{ if(!bbDrag||!bbGroup) return;
+    const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+    bbRotY=bbDrag.ry+(cx-bbDrag.x)*0.01;
+    bbRotX=Math.max(-0.5,Math.min(0.5,bbDrag.rx+(cy-bbDrag.y)*0.008));
+    bbGroup.rotation.y=bbRotY; bbGroup.rotation.x=bbRotX; bbRender();
+    if(e.cancelable) e.preventDefault();
+  };
+  const up=()=>{ bbDrag=null; };
+  el.addEventListener("mousedown",down); window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+  el.addEventListener("touchstart",down,{passive:true}); el.addEventListener("touchmove",move,{passive:false}); el.addEventListener("touchend",up);
+}
+function bbRender(){ bbRenderer && bbRenderer.render(bbScene,bbCamera); }
+function buildBarbell(){
+  if(!window.THREE) return;
+  if(!bbRenderer) initBarbellScene();
+  if(!bbScene) return;
+  if(bbGroup){ bbScene.remove(bbGroup); }
+  bbGroup=new THREE.Group();
+  const steel=new THREE.MeshLambertMaterial({color:0xcfd3d8});
+  const accent=hexToThree("--accent");
+  // bar shaft
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,4.6,20), steel);
+  shaft.rotation.z=Math.PI/2; bbGroup.add(shaft);
+  // sleeves + collars
+  [-1,1].forEach(s=>{
+    const sleeve=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,1.1,18), steel);
+    sleeve.rotation.z=Math.PI/2; sleeve.position.x=s*1.9; bbGroup.add(sleeve);
+    const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.12,16), steel);
+    collar.rotation.z=Math.PI/2; collar.position.x=s*1.28; bbGroup.add(collar);
+  });
+  // plates: sorted largest->smallest, stacking outward from the collar on each side
+  const sorted=pcPlates.slice().sort((a,b)=>b-a);
+  [-1,1].forEach(side=>{
+    let x=1.42;  // start just outside the collar
+    sorted.forEach(p=>{
+      const spec=PLATE_SPEC[p]||[0.4,0.07];
+      const [rad,thick]=spec;
+      const plate=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,thick,28),
+        new THREE.MeshLambertMaterial({color:accent}));
+      plate.rotation.z=Math.PI/2;
+      plate.position.x=side*(x+thick/2);
+      bbGroup.add(plate);
+      x+=thick+0.02;
+    });
+  });
+  bbGroup.rotation.y=bbRotY; bbGroup.rotation.x=bbRotX;
+  bbScene.add(bbGroup);
+  bbRender();
+}
+function disposeBarbell(){
+  if(bbRenderer){ bbRenderer.dispose&&bbRenderer.dispose(); }
+  bbRenderer=null; bbScene=null; bbGroup=null;
+  const el=$("#barbell3d"); if(el) el.innerHTML="";
 }
 $("#pc-total") && ($("#pc-total").oninput = renderW2P);
 document.addEventListener("DOMContentLoaded", ()=>{});
 $$(".pc-tab").forEach(t=> t.onclick = ()=> setPcMode(t.dataset.mode));
 $("#pc-clear") && ($("#pc-clear").onclick = ()=>{ pcPlates=[]; renderP2W(); });
-$("#pc-close") && ($("#pc-close").onclick = ()=> $("#plateBg").classList.remove("show"));
-$("#plateBg") && ($("#plateBg").addEventListener("click", e=>{ if(e.target===$("#plateBg")) $("#plateBg").classList.remove("show"); }));
+$("#pc-close") && ($("#pc-close").onclick = ()=>{ disposeBarbell(); $("#plateBg").classList.remove("show"); });
+$("#plateBg") && ($("#plateBg").addEventListener("click", e=>{ if(e.target===$("#plateBg")){ disposeBarbell(); $("#plateBg").classList.remove("show"); } }));
 
 /* ============ HOME ============ */
 function renderHome(){
