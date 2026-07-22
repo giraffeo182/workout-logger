@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
     --bg:#F5F4F1; --card:#FFFFFF; --ink:#17181A; --muted:#6E7076;
@@ -157,7 +158,10 @@
     flex:none;padding:0;}
   .musclechip{border:1px solid var(--line);background:var(--accent-l);color:var(--accent);
     font-weight:700;cursor:pointer;font-family:inherit;}
-  .muscle-wrap{display:flex;justify-content:center;padding:6px 0 10px;}
+  .muscle-wrap{display:flex;justify-content:center;padding:6px 0 2px;}
+  #bodymap3d{width:220px;height:300px;touch-action:none;cursor:grab;}
+  #bodymap3d:active{cursor:grabbing;}
+  .muscle-hint{text-align:center;font-size:11px;color:var(--muted);margin:0 0 8px;font-weight:600;}
   #bodymap{width:150px;height:auto;}
   .muscle-legend{font-size:13px;line-height:1.7;}
   .ml-row{display:flex;align-items:center;gap:8px;}
@@ -575,8 +579,9 @@
   <div class="modal">
     <h3 id="muscle-title">Muscles worked</h3>
     <div class="muscle-wrap">
-      <svg id="bodymap" viewBox="0 0 200 380" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="bodymap3d"></div>
     </div>
+    <p class="muscle-hint">Drag to rotate</p>
     <div class="muscle-legend" id="muscle-legend"></div>
     <div class="btnrow" style="margin-top:14px">
       <button class="btn" id="muscle-close">Done</button>
@@ -586,9 +591,11 @@
 
 <script>
 /* ============ version + changelog ============ */
-const APP_VERSION = "1.2.0 beta 4";
+const APP_VERSION = "1.2.0 beta 5";
 const CHANGELOG = [
-  { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", tag:"current", notes:[
+  { ver:"1.2.0 beta 5", date:"Jul 21, 2026", time:"10:01 PM", tag:"current", notes:[
+    "The muscle map is now a rotatable 3D body — drag to spin it around and see the worked muscles from any angle." ]},
+  { ver:"1.2.0 beta 4", date:"Jul 21, 2026", time:"9:52 PM", notes:[
     "Each exercise now shows which muscles it works — tap the muscle chip to see a body-map highlight of the primary and secondary muscles.",
     "Returning to the home screen now keeps your scroll position instead of jumping to the top." ]},
   { ver:"1.2.0 beta 3", date:"Jul 21, 2026", time:"10:00 AM", notes:[
@@ -921,56 +928,125 @@ function platesFor(total){
   return {bar, list, perSide, leftover};
 }
 
-/* ============ muscle body map ============ */
-/* stylized front-view body; each region id maps to one or more SVG shapes */
-const BODY_SHAPES = {
-  frontdelts:'<ellipse cx="66" cy="96" rx="12" ry="10"/><ellipse cx="134" cy="96" rx="12" ry="10"/>',
-  sidedelts:'<ellipse cx="56" cy="98" rx="8" ry="11"/><ellipse cx="144" cy="98" rx="8" ry="11"/>',
-  chest:'<path d="M78 92 h44 a6 6 0 0 1 6 6 v18 a10 10 0 0 1 -10 10 h-42 a10 10 0 0 1 -10 -10 v-18 a6 6 0 0 1 6 -6 z"/>',
-  abs:'<rect x="86" y="132" width="28" height="46" rx="6"/>',
-  biceps:'<ellipse cx="54" cy="128" rx="8" ry="16"/><ellipse cx="146" cy="128" rx="8" ry="16"/>',
-  triceps:'<ellipse cx="48" cy="130" rx="7" ry="15"/><ellipse cx="152" cy="130" rx="7" ry="15"/>',
-  forearms:'<ellipse cx="46" cy="162" rx="7" ry="17"/><ellipse cx="154" cy="162" rx="7" ry="17"/>',
-  traps:'<path d="M84 78 q16 -10 32 0 l-6 8 h-20 z"/>',
-  quads:'<ellipse cx="86" cy="230" rx="13" ry="34"/><ellipse cx="114" cy="230" rx="13" ry="34"/>',
-  hamstrings:'<ellipse cx="86" cy="238" rx="12" ry="30"/><ellipse cx="114" cy="238" rx="12" ry="30"/>',
-  glutes:'<ellipse cx="86" cy="196" rx="14" ry="12"/><ellipse cx="114" cy="196" rx="14" ry="12"/>',
-  calves:'<ellipse cx="87" cy="300" rx="9" ry="24"/><ellipse cx="113" cy="300" rx="9" ry="24"/>',
-  lats:'<path d="M72 118 l-6 30 8 6 6 -34 z"/><path d="M128 118 l6 30 -8 6 -6 -34 z"/>',
-  upperback:'<rect x="82" y="104" width="36" height="26" rx="6"/>',
-  lowerback:'<rect x="84" y="150" width="32" height="22" rx="5"/>',
-  reardelts:'<ellipse cx="64" cy="100" rx="9" ry="9"/><ellipse cx="136" cy="100" rx="9" ry="9"/>'
-};
+/* ============ muscle body map (3D) ============ */
+/* Each body part is a mesh tagged with a muscle id (or "base" for structure).
+   parts: [id, geomType, [sx,sy,sz]|radius, [x,y,z], mirror?] */
+const BODY_PARTS = [
+  ["base","sphere",0.42,[0,3.05,0]],              // head
+  ["base","cyl",[0.16,0.16,0.5],[0,2.55,0]],      // neck
+  ["traps","box",[0.9,0.28,0.5],[0,2.42,0.02]],   // traps (upper shoulders)
+  ["chest","box",[1.15,0.5,0.42],[0,2.05,0.28]],  // chest (front)
+  ["upperback","box",[1.15,0.55,0.4],[0,2.05,-0.28]], // upper back
+  ["abs","box",[0.72,0.85,0.4],[0,1.45,0.3]],     // abs (front)
+  ["lowerback","box",[0.8,0.6,0.36],[0,1.4,-0.3]],// lower back
+  ["base","box",[1.0,1.5,0.7],[0,1.7,0]],         // torso core
+  ["frontdelts","sphere",0.3,[0.72,2.28,0.15],1], // shoulders front
+  ["reardelts","sphere",0.24,[0.72,2.28,-0.18],1],// shoulders rear
+  ["sidedelts","sphere",0.24,[0.9,2.25,0],1],     // side delts
+  ["biceps","cyl",[0.19,0.19,0.75],[0.86,1.7,0.08],1],
+  ["triceps","cyl",[0.19,0.19,0.75],[0.86,1.7,-0.1],1],
+  ["forearms","cyl",[0.15,0.17,0.72],[0.92,1.0,0],1],
+  ["lats","box",[0.28,0.7,0.5],[0.6,1.75,-0.05],1], // lats (side of back)
+  ["glutes","sphere",0.42,[0.3,0.75,-0.2],1],
+  ["quads","cyl",[0.27,0.24,1.1],[0.3,0.15,0.08],1],
+  ["hamstrings","cyl",[0.25,0.24,1.05],[0.3,0.12,-0.12],1],
+  ["calves","cyl",[0.2,0.14,0.9],[0.3,-0.95,-0.05],1]
+];
+
+let mmRenderer, mmScene, mmCamera, mmMeshes=[], mmGroup, mmRAF=null, mmDrag=null;
+function hexToThree(varName){
+  // resolve a CSS var to a hex Three.js can use
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || "#888";
+  return new THREE.Color(v);
+}
+function buildBody(){
+  const el = $("#bodymap3d");
+  el.innerHTML = "";
+  const w = el.clientWidth||220, h = el.clientHeight||300;
+  mmScene = new THREE.Scene();
+  mmCamera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
+  mmCamera.position.set(0, 1.2, 8.2);
+  mmCamera.lookAt(0, 1.2, 0);
+  mmRenderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  mmRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  mmRenderer.setSize(w, h);
+  el.appendChild(mmRenderer.domElement);
+  mmScene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const key = new THREE.DirectionalLight(0xffffff, 0.7); key.position.set(3,6,6); mmScene.add(key);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.3); rim.position.set(-4,2,-5); mmScene.add(rim);
+
+  mmGroup = new THREE.Group();
+  mmMeshes = [];
+  BODY_PARTS.forEach(([id,type,dim,pos,mirror])=>{
+    const build = (px)=>{
+      let geo;
+      if(type==="sphere") geo=new THREE.SphereGeometry(dim,20,16);
+      else if(type==="cyl") geo=new THREE.CylinderGeometry(dim[0],dim[1],dim[2],18);
+      else geo=new THREE.BoxGeometry(dim[0],dim[1],dim[2]);
+      const mat=new THREE.MeshLambertMaterial({transparent:true});
+      const mesh=new THREE.Mesh(geo,mat);
+      mesh.position.set(px,pos[1],pos[2]);
+      mesh.userData.muscle=id;
+      // slightly round boxes look blocky; leave as-is for the mannequin aesthetic
+      mmGroup.add(mesh); mmMeshes.push(mesh);
+    };
+    build(pos[0]);
+    if(mirror) build(-pos[0]);
+  });
+  mmGroup.position.y = -1.0;
+  mmScene.add(mmGroup);
+  attachDrag(el);
+}
+function paintBody(prim, sec){
+  const baseCol = hexToThree("--line");
+  const accent = hexToThree("--accent");
+  mmMeshes.forEach(mesh=>{
+    const id = mesh.userData.muscle;
+    const mat = mesh.material;
+    if(prim.has(id)){ mat.color.copy(accent); mat.opacity=1; }
+    else if(sec.has(id)){ mat.color.copy(accent); mat.opacity=0.45; }
+    else { mat.color.copy(baseCol); mat.opacity= id==="base"?0.9:0.85; }
+  });
+}
+function mmRender(){ mmRenderer && mmRenderer.render(mmScene, mmCamera); }
+function attachDrag(el){
+  let px=0, rotY=0.3, rotX=0;
+  mmGroup.rotation.y = rotY;
+  const down = e=>{ mmDrag={x:(e.touches?e.touches[0].clientX:e.clientX), y:(e.touches?e.touches[0].clientY:e.clientY), ry:rotY, rx:rotX}; };
+  const move = e=>{
+    if(!mmDrag) return;
+    const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY;
+    rotY = mmDrag.ry + (cx-mmDrag.x)*0.01;
+    rotX = Math.max(-0.6, Math.min(0.6, mmDrag.rx + (cy-mmDrag.y)*0.008));
+    mmGroup.rotation.y = rotY; mmGroup.rotation.x = rotX; mmRender();
+    if(e.cancelable) e.preventDefault();
+  };
+  const up = ()=>{ mmDrag=null; };
+  el.addEventListener("mousedown",down); window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+  el.addEventListener("touchstart",down,{passive:true}); el.addEventListener("touchmove",move,{passive:false}); el.addEventListener("touchend",up);
+}
 function openMuscleMap(ex){
   const m = musclesFor(ex); if(!m) return;
   $("#muscle-title").textContent = ex.name;
+  $("#muscleBg").classList.add("show");
   const prim = new Set(m.primary), sec = new Set(m.secondary||[]);
-  // base body silhouette
-  const body = `
-    <g fill="var(--line)" opacity="0.55">
-      <circle cx="100" cy="46" r="20"/>
-      <rect x="72" y="70" width="56" height="74" rx="16"/>
-      <rect x="80" y="140" width="40" height="60" rx="12"/>
-      <rect x="42" y="92" width="16" height="92" rx="8"/>
-      <rect x="142" y="92" width="16" height="92" rx="8"/>
-      <rect x="78" y="196" width="18" height="130" rx="9"/>
-      <rect x="104" y="196" width="18" height="130" rx="9"/>
-    </g>`;
-  // highlighted regions
-  let hl = "";
-  Object.keys(BODY_SHAPES).forEach(id=>{
-    if(prim.has(id)) hl += `<g fill="var(--accent)" opacity="0.95">${BODY_SHAPES[id]}</g>`;
-    else if(sec.has(id)) hl += `<g fill="var(--accent)" opacity="0.4">${BODY_SHAPES[id]}</g>`;
+  // build (or rebuild) after the modal is visible so the canvas has a size
+  requestAnimationFrame(()=>{
+    if(!window.THREE){ $("#bodymap3d").innerHTML = '<p class="settings-note">3D view failed to load.</p>'; }
+    else { buildBody(); paintBody(prim, sec); mmRender(); }
   });
-  $("#bodymap").innerHTML = body + hl;
-  // legend
   const line = (ids, label, cls) => ids.length
     ? `<div class="ml-row"><span class="ml-dot ${cls}"></span>${label}: ${ids.map(id=>MUSCLE_LABELS[id]||id).join(", ")}</div>` : "";
   $("#muscle-legend").innerHTML = line(m.primary,"Primary","prim") + line(m.secondary||[],"Secondary","sec");
-  $("#muscleBg").classList.add("show");
 }
-$("#muscle-close") && ($("#muscle-close").onclick = ()=> $("#muscleBg").classList.remove("show"));
-$("#muscleBg") && ($("#muscleBg").addEventListener("click", e=>{ if(e.target===$("#muscleBg")) $("#muscleBg").classList.remove("show"); }));
+function closeMuscle(){
+  $("#muscleBg").classList.remove("show");
+  if(mmRenderer){ mmRenderer.dispose && mmRenderer.dispose(); }
+  const el=$("#bodymap3d"); if(el) el.innerHTML="";
+  mmMeshes=[];
+}
+$("#muscle-close") && ($("#muscle-close").onclick = closeMuscle);
+$("#muscleBg") && ($("#muscleBg").addEventListener("click", e=>{ if(e.target===$("#muscleBg")) closeMuscle(); }));
 
 /* ============ plate calculator modal ============ */
 let pcPlates = [];  // plates on one side in plates→weight mode
